@@ -1,0 +1,521 @@
+// Prisma schema for HRMS — Bahir Dar University
+// Requirements: 1.1, 2.1, 3.1, 4.1, 9.1
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum AcademicRank {
+  LECTURER
+  ASSISTANT_PROFESSOR
+  ASSOCIATE_PROFESSOR
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum BaseRole {
+  SUPER_ADMIN
+  ADMIN
+  HR_OFFICER
+  EMPLOYEE
+}
+
+enum SpecialPrivilege {
+  UNIVERSITY_PRESIDENT
+  VICE_PRESIDENT
+  DEAN
+  DIRECTOR
+}
+
+enum PostingType {
+  INTERNAL
+  EXTERNAL
+}
+
+enum RecruitmentStage {
+  SCREENING
+  INTERVIEW
+  SELECTION
+  OFFER
+}
+
+enum OnboardingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum LeaveTypeName {
+  ANNUAL
+  MATERNITY_PRENATAL
+  MATERNITY_POSTNATAL
+  PATERNITY
+  SICK_FULL
+  SICK_HALF
+  PERSONAL
+  SPECIAL
+  LEAVE_WITHOUT_PAY
+  STUDY
+  RESEARCH
+  SABBATICAL
+  SEMINAR
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TrainingStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum PayrollExportFormat {
+  EXCEL
+  PDF
+  DOCX
+}
+
+enum ReportStatus {
+  DRAFT
+  SENT
+  VALIDATED
+}
+
+enum ClearanceStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ApprovalMode {
+  SEQUENTIAL
+  PARALLEL
+}
+
+enum ClearanceTaskStatus {
+  PENDING
+  ACTIVE
+  APPROVED
+  REJECTED
+}
+
+enum LetterFormat {
+  PDF
+  DOCX
+}
+
+// ─── Organizational Hierarchy ─────────────────────────────────────────────────
+
+model Campus {
+  id         String              @id @default(uuid())
+  code       String              @unique // immutable Campus_Code
+  name       String
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  colleges   College[]
+  employees  Employee[]
+  idCounters EmployeeIDCounter[]
+}
+
+model College {
+  id          String       @id @default(uuid())
+  name        String
+  campusId    String
+  campus      Campus       @relation(fields: [campusId], references: [id])
+  departments Department[]
+}
+
+model Department {
+  id        String     @id @default(uuid())
+  name      String
+  collegeId String
+  college   College    @relation(fields: [collegeId], references: [id])
+  units     Unit[]
+  employees Employee[]
+}
+
+model Unit {
+  id           String     @id @default(uuid())
+  name         String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  employees    Employee[]
+}
+
+// ─── Employee Profile ─────────────────────────────────────────────────────────
+
+model Employee {
+  id               String         @id @default(uuid())
+  employeeId       String         @unique // e.g. BDU-2026-00001
+  fullName         String
+  dateOfBirth      DateTime
+  gender           Gender
+  nationality      String
+  contactInfo      Json // { phone, email, address }
+  emergencyContact Json // { name, phone, relationship }
+  academicRank     AcademicRank?
+  status           EmployeeStatus @default(PENDING)
+  campusId         String
+  campus           Campus         @relation(fields: [campusId], references: [id])
+  departmentId     String?
+  department       Department?    @relation(fields: [departmentId], references: [id])
+  unitId           String?
+  unit             Unit?          @relation(fields: [unitId], references: [id])
+  hireDate         DateTime?
+  endDate          DateTime?
+  passwordHash     String
+  isTempPassword   Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  userRole            UserRole?
+  documents           EmployeeDocument[]
+  employmentHistory   EmploymentHistory[]
+  leaveBalances       LeaveBalance[]
+  leaveApplications   LeaveApplication[]
+  evaluations         Evaluation[]
+  trainingAssignments TrainingAssignment[]
+  clearanceRecord     ClearanceRecord?
+  experienceLetters   ExperienceLetter[]
+  activityLogs        ActivityLog[]
+  scheduleEntries     ScheduleEntry[]
+}
+
+model EmployeeDocument {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  documentType String // "appointment_letter" | "contract" | other
+  fileUrl      String
+  uploadedAt   DateTime @default(now())
+  uploadedBy   String // Employee.id of the HR_Officer
+}
+
+model EmploymentHistory {
+  id            String   @id @default(uuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id])
+  changeType    String // "position" | "department" | "status"
+  previousValue String?
+  newValue      String
+  changedBy     String // Employee.id of acting user
+  changedAt     DateTime @default(now())
+}
+
+// ─── RBAC & Special Privileges ────────────────────────────────────────────────
+
+model UserRole {
+  id               String            @id @default(uuid())
+  employeeId       String            @unique
+  employee         Employee          @relation(fields: [employeeId], references: [id])
+  baseRole         BaseRole
+  specialPrivilege SpecialPrivilege?
+  updatedAt        DateTime          @updatedAt
+}
+
+model Permission {
+  id              String                @id @default(uuid())
+  code            String                @unique // e.g. "leave:approve"
+  description     String
+  rolePermissions RolePermission[]
+  privilegePerms  PrivilegePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  role         BaseRole
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([role, permissionId])
+}
+
+model PrivilegePermission {
+  id           String           @id @default(uuid())
+  privilege    SpecialPrivilege
+  permissionId String
+  permission   Permission       @relation(fields: [permissionId], references: [id])
+
+  @@unique([privilege, permissionId])
+}
+
+// ─── Employee ID Sequence Counter ─────────────────────────────────────────────
+
+model EmployeeIDCounter {
+  id       String @id @default(uuid())
+  campusId String
+  campus   Campus @relation(fields: [campusId], references: [id])
+  year     Int
+  sequence Int    @default(0)
+
+  @@unique([campusId, year])
+}
+
+// ─── Recruitment (ATS) ────────────────────────────────────────────────────────
+
+model JobPosting {
+  id           String         @id @default(uuid())
+  type         PostingType
+  title        String
+  description  String
+  requirements String
+  deadline     DateTime
+  isAcademic   Boolean        @default(false)
+  createdBy    String
+  createdAt    DateTime       @default(now())
+  applications Application[]
+}
+
+model Application {
+  id                   String             @id @default(uuid())
+  jobPostingId         String
+  jobPosting           JobPosting         @relation(fields: [jobPostingId], references: [id])
+  candidateName        String
+  candidateEmail       String
+  submittedAt          DateTime           @default(now())
+  currentStage         RecruitmentStage   @default(SCREENING)
+  publicationEvalScore Float?
+  stageHistory         ApplicationStage[]
+}
+
+model ApplicationStage {
+  id             String           @id @default(uuid())
+  applicationId  String
+  application    Application      @relation(fields: [applicationId], references: [id])
+  stage          RecruitmentStage
+  transitionedAt DateTime         @default(now())
+  transitionedBy String
+}
+
+// ─── Onboarding ───────────────────────────────────────────────────────────────
+
+model OnboardingWorkflow {
+  id            String             @id @default(uuid())
+  applicationId String             @unique
+  status        OnboardingStatus   @default(PENDING)
+  createdAt     DateTime           @default(now())
+  documents     OnboardingDocument[]
+  assetAssignments AssetAssignment[]
+}
+
+model OnboardingDocument {
+  id                   String             @id @default(uuid())
+  onboardingWorkflowId String
+  workflow             OnboardingWorkflow @relation(fields: [onboardingWorkflowId], references: [id])
+  documentType         String
+  isCollected          Boolean            @default(false)
+  collectedAt          DateTime?
+}
+
+model AssetAssignment {
+  id                   String             @id @default(uuid())
+  onboardingWorkflowId String
+  workflow             OnboardingWorkflow @relation(fields: [onboardingWorkflowId], references: [id])
+  assetName            String
+  assignedAt           DateTime?
+  isAssigned           Boolean            @default(false)
+}
+
+// ─── Timetable ────────────────────────────────────────────────────────────────
+
+model ScheduleEntry {
+  id            String         @id @default(uuid())
+  employeeId    String
+  employee      Employee       @relation(fields: [employeeId], references: [id])
+  course        String
+  dayOfWeek     Int // 0=Sunday … 6=Saturday
+  startTime     String // "HH:MM"
+  endTime       String // "HH:MM"
+  location      String
+  createdAt     DateTime       @default(now())
+  substitutions Substitution[]
+}
+
+model Substitution {
+  id              String        @id @default(uuid())
+  scheduleEntryId String
+  scheduleEntry   ScheduleEntry @relation(fields: [scheduleEntryId], references: [id])
+  substituteId    String
+  sessionDate     DateTime
+  loggedAt        DateTime      @default(now())
+  loggedBy        String
+}
+
+// ─── Leave Management ─────────────────────────────────────────────────────────
+
+model LeaveType {
+  id           String          @id @default(uuid())
+  name         LeaveTypeName   @unique
+  description  String
+  maxDays      Int?
+  payRate      Float           @default(1.0) // 1.0 = full pay, 0.5 = half pay
+  balances     LeaveBalance[]
+  applications LeaveApplication[]
+}
+
+model LeaveBalance {
+  id          String    @id @default(uuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  leaveTypeId String
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id])
+  balance     Float     @default(0)
+  year        Int
+
+  @@unique([employeeId, leaveTypeId, year])
+}
+
+model LeaveApplication {
+  id              String      @id @default(uuid())
+  employeeId      String
+  employee        Employee    @relation(fields: [employeeId], references: [id])
+  leaveTypeId     String
+  leaveType       LeaveType   @relation(fields: [leaveTypeId], references: [id])
+  startDate       DateTime
+  endDate         DateTime
+  reason          String
+  status          LeaveStatus @default(PENDING)
+  rejectionReason String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  supportingDocs  String[] // file URLs (e.g. medical certificate)
+}
+
+// ─── Performance Appraisal ────────────────────────────────────────────────────
+
+model Evaluation {
+  id               String   @id @default(uuid())
+  employeeId       String
+  employee         Employee @relation(fields: [employeeId], references: [id])
+  evaluationPeriod String // e.g. "2025-Q1"
+  efficiencyScore  Float
+  workOutputScore  Float
+  createdBy        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ─── Training & LMS ───────────────────────────────────────────────────────────
+
+model TrainingProgram {
+  id           String               @id @default(uuid())
+  title        String
+  description  String
+  competencies String[] // list of competency tags
+  assignments  TrainingAssignment[]
+}
+
+model TrainingAssignment {
+  id                 String          @id @default(uuid())
+  employeeId         String
+  employee           Employee        @relation(fields: [employeeId], references: [id])
+  trainingProgramId  String
+  trainingProgram    TrainingProgram @relation(fields: [trainingProgramId], references: [id])
+  assignedDate       DateTime        @default(now())
+  expectedCompletion DateTime
+  completionDate     DateTime?
+  status             TrainingStatus  @default(ASSIGNED)
+}
+
+// ─── Payroll Reports ──────────────────────────────────────────────────────────
+
+model PayrollReport {
+  id          String          @id @default(uuid())
+  period      String // e.g. "2025-06"
+  generatedBy String
+  generatedAt DateTime        @default(now())
+  status      ReportStatus    @default(DRAFT)
+  exports     PayrollExport[]
+}
+
+model PayrollExport {
+  id              String              @id @default(uuid())
+  payrollReportId String
+  payrollReport   PayrollReport       @relation(fields: [payrollReportId], references: [id])
+  format          PayrollExportFormat
+  fileUrl         String
+  exportedAt      DateTime            @default(now())
+}
+
+// ─── Clearance & Offboarding ──────────────────────────────────────────────────
+
+model ClearanceBody {
+  id           String        @id @default(uuid())
+  name         String        @unique // e.g. "Library", "IT", "Finance"
+  approvalMode ApprovalMode  @default(PARALLEL)
+  order        Int // used for sequential ordering
+  tasks        ClearanceTask[]
+}
+
+model ClearanceRecord {
+  id          String          @id @default(uuid())
+  employeeId  String          @unique
+  employee    Employee        @relation(fields: [employeeId], references: [id])
+  status      ClearanceStatus @default(IN_PROGRESS)
+  initiatedAt DateTime        @default(now())
+  completedAt DateTime?
+  tasks       ClearanceTask[]
+}
+
+model ClearanceTask {
+  id                String              @id @default(uuid())
+  clearanceRecordId String
+  clearanceRecord   ClearanceRecord     @relation(fields: [clearanceRecordId], references: [id])
+  clearanceBodyId   String
+  clearanceBody     ClearanceBody       @relation(fields: [clearanceBodyId], references: [id])
+  status            ClearanceTaskStatus @default(PENDING)
+  approvedBy        String?
+  approvedAt        DateTime?
+  rejectionReason   String?
+  updatedAt         DateTime            @updatedAt
+}
+
+// ─── Experience Letter ────────────────────────────────────────────────────────
+
+model ExperienceLetter {
+  id          String       @id @default(uuid())
+  employeeId  String
+  employee    Employee     @relation(fields: [employeeId], references: [id])
+  generatedBy String
+  generatedAt DateTime     @default(now())
+  format      LetterFormat
+  fileUrl     String
+}
+
+// ─── Activity Log ─────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id             String   @id @default(uuid())
+  actingUserId   String
+  actingEmployee Employee @relation(fields: [actingUserId], references: [id])
+  actingRole     String
+  actionType     String // e.g. "LEAVE_APPROVED", "EMPLOYEE_CREATED"
+  resourceType   String // e.g. "Employee", "LeaveApplication"
+  resourceId     String
+  previousState  Json?
+  newState       Json?
+  ipAddress      String
+  timestamp      DateTime @default(now())
+  // No update or delete operations are permitted on this model (enforced at service layer + DB trigger)
+}
