@@ -1,4 +1,6 @@
+import "dotenv/config";
 import { PrismaClient, LeaveTypeName, BaseRole } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -10,85 +12,85 @@ const leaveTypes: Array<{
   maxDays: number | null;
   payRate: number;
 }> = [
-  {
-    name: LeaveTypeName.ANNUAL,
-    description: 'Annual leave entitlement (20 days first year, +1/year up to 30)',
-    maxDays: 30,
-    payRate: 1.0,
-  },
-  {
-    name: LeaveTypeName.MATERNITY_PRENATAL,
-    description: 'Maternity leave — prenatal period (30 calendar days at full pay)',
-    maxDays: 30,
-    payRate: 1.0,
-  },
-  {
-    name: LeaveTypeName.MATERNITY_POSTNATAL,
-    description: 'Maternity leave — postnatal period (90 calendar days at full pay)',
-    maxDays: 90,
-    payRate: 1.0,
-  },
-  {
-    name: LeaveTypeName.PATERNITY,
-    description: 'Paternity leave (10 working days at full pay)',
-    maxDays: 10,
-    payRate: 1.0,
-  },
-  {
-    name: LeaveTypeName.SICK_FULL,
-    description: 'Sick leave at full pay (up to 6 months within a 12-month period)',
-    maxDays: 180,
-    payRate: 1.0,
-  },
-  {
-    name: LeaveTypeName.SICK_HALF,
-    description: 'Sick leave at half pay (up to 2 additional months after 6-month full-pay period)',
-    maxDays: 60,
-    payRate: 0.5,
-  },
-  {
-    name: LeaveTypeName.PERSONAL,
-    description: 'Personal leave for marriage or bereavement of immediate family (3 working days)',
-    maxDays: 3,
-    payRate: 1.0,
-  },
-  {
-    name: LeaveTypeName.SPECIAL,
-    description: 'Special leave for court summons or election duty (subject to HR approval)',
-    maxDays: null,
-    payRate: 1.0,
-  },
-  {
-    name: LeaveTypeName.LEAVE_WITHOUT_PAY,
-    description: 'Unpaid leave (max 2 years, requires University President approval)',
-    maxDays: 730,
-    payRate: 0.0,
-  },
-  {
-    name: LeaveTypeName.STUDY,
-    description: 'Study leave for academic staff pursuing higher degree (full pay year 1, 50% thereafter)',
-    maxDays: null,
-    payRate: 1.0,
-  },
-  {
-    name: LeaveTypeName.RESEARCH,
-    description: 'Research leave for Assistant Professor+ with 3+ years service (up to 6 months at full pay)',
-    maxDays: 180,
-    payRate: 1.0,
-  },
-  {
-    name: LeaveTypeName.SABBATICAL,
-    description: 'Sabbatical leave for Assistant Professor+ with 6+ continuous years (1 year at full pay)',
-    maxDays: 365,
-    payRate: 1.0,
-  },
-  {
-    name: LeaveTypeName.SEMINAR,
-    description: 'Leave for seminars, workshops, or short courses (max 30 academic calendar days/year)',
-    maxDays: 30,
-    payRate: 1.0,
-  },
-];
+    {
+      name: LeaveTypeName.ANNUAL,
+      description: 'Annual leave entitlement (20 days first year, +1/year up to 30)',
+      maxDays: 30,
+      payRate: 1.0,
+    },
+    {
+      name: LeaveTypeName.MATERNITY_PRENATAL,
+      description: 'Maternity leave — prenatal period (30 calendar days at full pay)',
+      maxDays: 30,
+      payRate: 1.0,
+    },
+    {
+      name: LeaveTypeName.MATERNITY_POSTNATAL,
+      description: 'Maternity leave — postnatal period (90 calendar days at full pay)',
+      maxDays: 90,
+      payRate: 1.0,
+    },
+    {
+      name: LeaveTypeName.PATERNITY,
+      description: 'Paternity leave (10 working days at full pay)',
+      maxDays: 10,
+      payRate: 1.0,
+    },
+    {
+      name: LeaveTypeName.SICK_FULL,
+      description: 'Sick leave at full pay (up to 6 months within a 12-month period)',
+      maxDays: 180,
+      payRate: 1.0,
+    },
+    {
+      name: LeaveTypeName.SICK_HALF,
+      description: 'Sick leave at half pay (up to 2 additional months after 6-month full-pay period)',
+      maxDays: 60,
+      payRate: 0.5,
+    },
+    {
+      name: LeaveTypeName.PERSONAL,
+      description: 'Personal leave for marriage or bereavement of immediate family (3 working days)',
+      maxDays: 3,
+      payRate: 1.0,
+    },
+    {
+      name: LeaveTypeName.SPECIAL,
+      description: 'Special leave for court summons or election duty (subject to HR approval)',
+      maxDays: null,
+      payRate: 1.0,
+    },
+    {
+      name: LeaveTypeName.LEAVE_WITHOUT_PAY,
+      description: 'Unpaid leave (max 2 years, requires University President approval)',
+      maxDays: 730,
+      payRate: 0.0,
+    },
+    {
+      name: LeaveTypeName.STUDY,
+      description: 'Study leave for academic staff pursuing higher degree (full pay year 1, 50% thereafter)',
+      maxDays: null,
+      payRate: 1.0,
+    },
+    {
+      name: LeaveTypeName.RESEARCH,
+      description: 'Research leave for Assistant Professor+ with 3+ years service (up to 6 months at full pay)',
+      maxDays: 180,
+      payRate: 1.0,
+    },
+    {
+      name: LeaveTypeName.SABBATICAL,
+      description: 'Sabbatical leave for Assistant Professor+ with 6+ continuous years (1 year at full pay)',
+      maxDays: 365,
+      payRate: 1.0,
+    },
+    {
+      name: LeaveTypeName.SEMINAR,
+      description: 'Leave for seminars, workshops, or short courses (max 30 academic calendar days/year)',
+      maxDays: 30,
+      payRate: 1.0,
+    },
+  ];
 
 // ─── Permission seed data ─────────────────────────────────────────────────────
 
@@ -236,7 +238,10 @@ async function main() {
         maxDays: lt.maxDays,
         payRate: lt.payRate,
       },
-      create: lt,
+      create: {
+        id: randomUUID(),
+        ...lt,
+      },
     });
   }
   console.log(`  ✓ ${leaveTypes.length} leave types seeded`);
@@ -246,7 +251,10 @@ async function main() {
     await prisma.permission.upsert({
       where: { code: perm.code },
       update: { description: perm.description },
-      create: perm,
+      create: {
+        id: randomUUID(),
+        ...perm,
+      },
     });
   }
   console.log(`  ✓ ${permissions.length} permissions seeded`);
@@ -263,7 +271,11 @@ async function main() {
       await prisma.rolePermission.upsert({
         where: { role_permissionId: { role, permissionId: permission.id } },
         update: {},
-        create: { role, permissionId: permission.id },
+        create: {
+          id: randomUUID(),
+          role,
+          permissionId: permission.id
+        },
       });
       rpCount++;
     }
