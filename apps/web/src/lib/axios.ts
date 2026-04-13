@@ -17,10 +17,44 @@ api.interceptors.request.use((config) => {
 // Rule 6: never expose raw error objects to production browser logs.
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
+  async (err) => {
+    const originalConfig = err.config;
     const status: number | undefined = err.response?.status;
 
-    // Redirect to login on 401
+    // Redirect to login on 401 if refresh attempt fails, or no refresh token exists
+    if (status === 401 && !originalConfig._retry) {
+      originalConfig._retry = true;
+      const refreshToken = localStorage.getItem("refreshToken");
+
+      if (refreshToken) {
+        try {
+          // Attempt refresh
+          const { data } = await axios.post(`${api.defaults.baseURL}/auth/refresh`, { refreshToken });
+          const newAccessToken = data.data.accessToken;
+          const newRefreshToken = data.data.refreshToken;
+          localStorage.setItem("accessToken", newAccessToken);
+          localStorage.setItem("refreshToken", newRefreshToken);
+
+          // Update header and retry
+          if (originalConfig.headers) {
+            originalConfig.headers.Authorization = `Bearer ${newAccessToken}`;
+          }
+          return api(originalConfig);
+        } catch (refreshErr) {
+          // Refresh failed, log out
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          window.location.href = "/login";
+          return Promise.reject(refreshErr);
+        }
+      } else {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        window.location.href = "/login";
+        return Promise.reject(err);
+      }
+    }
+
     if (status === 401) {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");

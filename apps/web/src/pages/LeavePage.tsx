@@ -10,8 +10,8 @@ import { useAuth } from "../contexts/AuthContext.js";
 import { useWithCache } from "../hooks/useWithCache.js";
 
 interface LeaveType { id: string; name: string; }
-interface LeaveBalance { leaveTypeId: string; leaveType: { name: string }; balance: number; }
-interface LeaveApplication { id: string; leaveTypeId: string; leaveType: { name: string }; startDate: string; endDate: string; reason: string; status: string; rejectionReason?: string; }
+interface LeaveBalance { leaveTypeId: string; LeaveType: { name: string }; balance: number; }
+interface LeaveApplication { id: string; leaveTypeId: string; LeaveType: { name: string }; startDate: string; endDate: string; reason: string; status: string; rejectionReason?: string; }
 
 function ApplicationForm({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
@@ -244,7 +244,7 @@ export default function LeavePage() {
             {balances.map(b => (
               <Grid item xs={6} sm={4} md={3} key={b.leaveTypeId}>
                 <Paper variant="outlined" sx={{ p: 1.5, textAlign: "center" }}>
-                  <Typography variant="caption" color="text.secondary">{b.leaveType.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">{b.LeaveType.name}</Typography>
                   <Typography variant="h5">{b.balance}</Typography>
                   <Typography variant="caption">days</Typography>
                 </Paper>
@@ -272,7 +272,7 @@ export default function LeavePage() {
             </TableRow></TableHead>
             <TableBody>{applications.map(app => (
               <TableRow key={app.id}>
-                <TableCell>{app.leaveType.name}</TableCell>
+                <TableCell>{app.LeaveType.name}</TableCell>
                 <TableCell>{new Date(app.startDate).toLocaleDateString()}</TableCell>
                 <TableCell>{new Date(app.endDate).toLocaleDateString()}</TableCell>
                 <TableCell>{app.reason}</TableCell>

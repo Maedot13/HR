@@ -2,7 +2,7 @@ import { Router } from "express";
 import { LoginSchema, ChangePasswordSchema } from "@hrms/shared";
 import { authenticate } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
-import { login, changePassword, logout } from "../services/auth.service.js";
+import { login, changePassword, logout, refresh } from "../services/auth.service.js";
 
 const router = Router();
 
@@ -58,6 +58,22 @@ router.post("/logout", authenticate, async (req, res) => {
   await logout(req.user.userId, refreshToken, ipAddress);
 
   res.status(200).json({ data: { message: "Logged out successfully" } });
+});
+
+/**
+ * POST /api/v1/auth/refresh
+ * Public — validates refresh token and returns new tokens.
+ */
+router.post("/refresh", async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    throw new AppError(400, "TOKEN_REQUIRED", "refreshToken is required in the request body");
+  }
+
+  const ipAddress = req.ip ?? "unknown";
+  const result = await refresh(refreshToken, ipAddress);
+
+  res.status(200).json({ data: result });
 });
 
 export default router;

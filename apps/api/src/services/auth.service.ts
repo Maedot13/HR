@@ -161,3 +161,59 @@ export async function logout(
 export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, BCRYPT_COST);
 }
+
+/**
+ * Handle refresh token request
+ */
+export async function refresh(
+  oldRefreshToken: string,
+  ipAddress: string
+): Promise<LoginResult> {
+  if (revokedRefreshTokens.has(oldRefreshToken)) {
+    throw new AppError(401, "INVALID_TOKEN", "Refresh token has been revoked");
+  }
+
+  const secret = process.env.JWT_REFRESH_SECRET;
+  if (!secret) throw new AppError(500, "SERVER_MISCONFIGURATION", "JWT_REFRESH_SECRET is not configured");
+
+  let payload: JwtPayload;
+  try {
+    payload = jwt.verify(oldRefreshToken, secret) as JwtPayload;
+  } catch (err) {
+    throw new AppError(401, "INVALID_TOKEN", "Invalid or expired refresh token");
+  }
+
+  const employee = await prisma.employee.findUnique({
+    where: { id: payload.userId },
+    include: { UserRole: true },
+  });
+
+  if (!employee) throw new AppError(401, "INVALID_TOKEN", "User no longer exists");
+  if (employee.status === "INACTIVE") throw new AppError(403, "ACCOUNT_INACTIVE", "Account deactivated");
+
+  const newPayload: JwtPayload = {
+    userId: employee.id,
+    role: employee.UserRole?.baseRole ?? "EMPLOYEE",
+    specialPrivilege: employee.UserRole?.specialPrivilege ?? undefined,
+    campusId: employee.campusId,
+    isTempPassword: employee.isTempPassword,
+  };
+
+  const accessToken = signAccessToken(newPayload);
+  const refreshToken = signRefreshToken(newPayload);
+
+  // Revoke the old refresh token
+  revokedRefreshTokens.add(oldRefreshToken);
+
+  await logActivity({
+    actingUserId: employee.id,
+    actingRole: newPayload.role,
+    actionType: "TOKEN_REFRESH",
+    resourceType: "Employee",
+    resourceId: employee.id,
+    ipAddress,
+  });
+
+  return { accessToken, refreshToken, isTempPassword: employee.isTempPassword };
+}
+
