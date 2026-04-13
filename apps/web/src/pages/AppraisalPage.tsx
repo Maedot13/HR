@@ -10,26 +10,107 @@ import { useAuth } from "../contexts/AuthContext.js";
 
 interface Evaluation { id: string; employeeId: string; evaluationPeriod: string; efficiencyScore: number; workOutputScore: number; createdAt: string; }
 
+// Validates a score string: must be a number in 0–100
+function validateScore(label: string, v: string): string | undefined {
+  if (!v.trim()) return `${label} is required.`;
+  const n = Number(v);
+  if (isNaN(n)) return `${label} must be a number.`;
+  if (n < 0 || n > 100) return `${label} must be between 0 and 100.`;
+}
+// Evaluation period: e.g. 2025-Q1, 2025-H1, 2025-01, 2025
+const PERIOD_RE = /^\d{4}(-Q[1-4]|-H[12]|-\d{2})?$/;
+function validatePeriod(v: string): string | undefined {
+  if (!v.trim()) return "Evaluation period is required.";
+  if (!PERIOD_RE.test(v.trim())) return "Use a format like 2025-Q1, 2025-H1, or 2025-03.";
+}
+
 function EvaluationForm({ evaluation, employeeId, onClose }: { evaluation: Evaluation | null; employeeId: string; onClose: () => void }) {
   const qc = useQueryClient();
-  const [form, setForm] = useState({ evaluationPeriod: evaluation?.evaluationPeriod ?? "", efficiencyScore: evaluation?.efficiencyScore?.toString() ?? "", workOutputScore: evaluation?.workOutputScore?.toString() ?? "" });
-  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    evaluationPeriod: evaluation?.evaluationPeriod ?? "",
+    efficiencyScore:  evaluation?.efficiencyScore?.toString()  ?? "",
+    workOutputScore:  evaluation?.workOutputScore?.toString()  ?? "",
+  });
+  const [apiError, setApiError] = useState("");
+
+  // ── Per-field validation — each field knows its own error ────────────
+  const errs = {
+    evaluationPeriod: validatePeriod(form.evaluationPeriod),
+    efficiencyScore:  validateScore("Efficiency score",  form.efficiencyScore),
+    workOutputScore:  validateScore("Work output score", form.workOutputScore),
+  } as const;
+
+  const hasErrors = Object.values(errs).some(Boolean);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const show = (f: keyof typeof errs) => (touched[f] || submitAttempted) ? errs[f] : undefined;
+  const touch = (f: string) => setTouched(p => ({ ...p, [f]: true }));
 
   const save = useMutation({
     mutationFn: () => evaluation
-      ? api.put(`/evaluations/${evaluation.id}`, { ...form, efficiencyScore: Number(form.efficiencyScore), workOutputScore: Number(form.workOutputScore) })
-      : api.post(`/employees/${employeeId}/evaluations`, { ...form, efficiencyScore: Number(form.efficiencyScore), workOutputScore: Number(form.workOutputScore) }),
+      ? api.put(`/evaluations/${evaluation.id}`, {
+          ...form,
+          efficiencyScore: Number(form.efficiencyScore),
+          workOutputScore: Number(form.workOutputScore),
+        })
+      : api.post(`/employees/${employeeId}/evaluations`, {
+          ...form,
+          efficiencyScore: Number(form.efficiencyScore),
+          workOutputScore: Number(form.workOutputScore),
+        }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["evaluations", employeeId] }); onClose(); },
-    onError: (e: any) => setError(e.response?.data?.error?.message ?? "Error"),
+    onError: (e: any) => setApiError(
+      e.response?.data?.error?.message ??
+      "Unable to save evaluation. Check the scores and period format, then try again."
+    ),
   });
+
+  // Submit is only disabled while the API call is in-flight — not by validation state
+  const handleSave = () => {
+    setSubmitAttempted(true);
+    if (hasErrors) return;
+    setApiError("");
+    save.mutate();
+  };
 
   return (
     <Stack spacing={2} sx={{ mt: 1 }}>
-      {error && <Alert severity="error">{error}</Alert>}
-      <TextField label="Evaluation Period (e.g. 2025-Q1)" value={form.evaluationPeriod} onChange={e => setForm(p => ({ ...p, evaluationPeriod: e.target.value }))} required />
-      <TextField label="Efficiency Score (0–100)" type="number" value={form.efficiencyScore} onChange={e => setForm(p => ({ ...p, efficiencyScore: e.target.value }))} inputProps={{ min: 0, max: 100 }} required />
-      <TextField label="Work Output Score (0–100)" type="number" value={form.workOutputScore} onChange={e => setForm(p => ({ ...p, workOutputScore: e.target.value }))} inputProps={{ min: 0, max: 100 }} required />
-      <Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending}>Save</Button>
+      {/* API error is separate from field-level errors */}
+      {apiError && <Alert severity="error">{apiError}</Alert>}
+      <TextField
+        label="Evaluation Period"
+        placeholder="e.g. 2025-Q1"
+        value={form.evaluationPeriod}
+        onChange={e => setForm(p => ({ ...p, evaluationPeriod: e.target.value }))}
+        onBlur={() => touch("evaluationPeriod")}
+        error={!!show("evaluationPeriod")}
+        helperText={show("evaluationPeriod") ?? "Format: YYYY-Q1, YYYY-H1, or YYYY-MM"}
+        required
+      />
+      <TextField
+        label="Efficiency Score"
+        type="number"
+        value={form.efficiencyScore}
+        onChange={e => setForm(p => ({ ...p, efficiencyScore: e.target.value }))}
+        onBlur={() => touch("efficiencyScore")}
+        error={!!show("efficiencyScore")}
+        helperText={show("efficiencyScore") ?? "Enter a number from 0 to 100"}
+        inputProps={{ min: 0, max: 100, step: 1 }}
+        required
+      />
+      <TextField
+        label="Work Output Score"
+        type="number"
+        value={form.workOutputScore}
+        onChange={e => setForm(p => ({ ...p, workOutputScore: e.target.value }))}
+        onBlur={() => touch("workOutputScore")}
+        error={!!show("workOutputScore")}
+        helperText={show("workOutputScore") ?? "Enter a number from 0 to 100"}
+        inputProps={{ min: 0, max: 100, step: 1 }}
+        required
+      />
+      {/* Never disabled by validation — clicking always triggers submit attempt */}
+      <Button variant="contained" onClick={handleSave} disabled={save.isPending}>Save</Button>
     </Stack>
   );
 }

@@ -14,7 +14,11 @@ interface ClearanceRecord { id: string; employeeId: string; status: string; task
 
 function BodyForm({ body, onClose }: { body: ClearanceBody | null; onClose: () => void }) {
   const qc = useQueryClient();
-  const [form, setForm] = useState({ name: body?.name ?? "", approvalMode: body?.approvalMode ?? "PARALLEL", order: body?.order?.toString() ?? "1" });
+  const [form, setForm] = useState({
+    name: body?.name ?? "",
+    approvalMode: body?.approvalMode ?? "PARALLEL",
+    order: body?.order?.toString() ?? "1",
+  });
   const [error, setError] = useState("");
 
   const save = useMutation({
@@ -22,7 +26,10 @@ function BodyForm({ body, onClose }: { body: ClearanceBody | null; onClose: () =
       ? api.put(`/clearance/bodies/${body.id}`, { ...form, order: Number(form.order) })
       : api.post("/clearance/bodies", [{ ...form, order: Number(form.order) }]),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["clearance-bodies"] }); onClose(); },
-    onError: (e: any) => setError(e.response?.data?.error?.message ?? "Error"),
+    onError: (e: any) => setError(
+      e.response?.data?.error?.message ??
+      "Unable to save clearance body. Check the details and try again."
+    ),
   });
 
   return (
@@ -50,7 +57,10 @@ function RejectTaskDialog({ task, onClose }: { task: ClearanceTask; onClose: () 
   const reject = useMutation({
     mutationFn: () => api.put(`/clearance/tasks/${task.id}/reject`, { rejectionReason: reason }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["clearance-record"] }); onClose(); },
-    onError: (e: any) => setError(e.response?.data?.error?.message ?? "Error"),
+    onError: (e: any) => setError(
+      e.response?.data?.error?.message ??
+      "Unable to reject this task. Please try again or contact support."
+    ),
   });
 
   return (
@@ -58,12 +68,26 @@ function RejectTaskDialog({ task, onClose }: { task: ClearanceTask; onClose: () 
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
-          <TextField label="Rejection Reason" multiline rows={3} value={reason} onChange={e => setReason(e.target.value)} required />
+          <TextField
+            label="Rejection Reason"
+            multiline
+            rows={3}
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            required
+          />
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" color="error" onClick={() => reject.mutate()} disabled={reject.isPending || !reason}>Reject</Button>
+        <Button
+          variant="contained"
+          color="error"
+          onClick={() => reject.mutate()}
+          disabled={reject.isPending || !reason}
+        >
+          Reject
+        </Button>
       </DialogActions>
     </>
   );
@@ -79,10 +103,12 @@ export default function ClearancePage() {
   const [loadEmpId, setLoadEmpId] = useState("");
   const [activeEmpId, setActiveEmpId] = useState("");
   const [rejectTask, setRejectTask] = useState<ClearanceTask | null>(null);
+  // Shared error banner for inline Board operations (initiate, approve)
+  const [boardError, setBoardError] = useState("");
 
   const canAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
-  const { data: bodiesData, isLoading: bodiesLoading } = useQuery<{ data: ClearanceBody[] }>({
+  const { data: bodiesData, isLoading: bodiesLoading, isError: bodiesLoadFailed } = useQuery<{ data: ClearanceBody[] }>({
     queryKey: ["clearance-bodies"],
     queryFn: () => api.get("/clearance/bodies").then(r => r.data),
   });
@@ -95,39 +121,69 @@ export default function ClearancePage() {
 
   const initiate = useMutation({
     mutationFn: (empId: string) => api.post(`/employees/${empId}/clearance`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["clearance-record"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["clearance-record"] }); setBoardError(""); },
+    onError: (e: any) => setBoardError(
+      e.response?.data?.error?.message ??
+      "Unable to initiate clearance. Ensure the employee ID is correct and try again."
+    ),
   });
 
   const approve = useMutation({
     mutationFn: (taskId: string) => api.put(`/clearance/tasks/${taskId}/approve`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["clearance-record", activeEmpId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["clearance-record", activeEmpId] }); setBoardError(""); },
+    onError: (e: any) => setBoardError(
+      e.response?.data?.error?.message ??
+      "Unable to approve this task. Please try again or contact support."
+    ),
   });
 
   const bodies: ClearanceBody[] = bodiesData?.data ?? [];
   const record = recordData?.data;
 
-  const taskStatusColor = (s: string) => s === "APPROVED" ? "success" : s === "REJECTED" ? "error" : s === "ACTIVE" ? "warning" : "default";
+  const taskStatusColor = (s: string) =>
+    s === "APPROVED" ? "success" : s === "REJECTED" ? "error" : s === "ACTIVE" ? "warning" : "default";
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>Clearance & Offboarding</Typography>
+      <Typography variant="h5" gutterBottom>Clearance &amp; Offboarding</Typography>
       <Paper>
         <Tabs value={tab} onChange={(_, v) => setTab(v)}>
           <Tab label="Clearance Bodies" /><Tab label="Clearance Board" />
         </Tabs>
         <Box sx={{ p: 2 }}>
+          {/* ── Clearance Bodies tab ─────────────────────────────────────── */}
           {tab === 0 && (
             <Box>
-              {canAdmin && <Button variant="contained" onClick={() => { setEditBody(null); setBodyOpen(true); }} sx={{ mb: 2 }}>Add Body</Button>}
+              {canAdmin && (
+                <Button
+                  variant="contained"
+                  onClick={() => { setEditBody(null); setBodyOpen(true); }}
+                  sx={{ mb: 2 }}
+                >
+                  Add Body
+                </Button>
+              )}
+              {bodiesLoadFailed && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  Failed to load clearance bodies. Check your connection and refresh the page.
+                </Alert>
+              )}
               {bodiesLoading ? <Typography>Loading...</Typography> : (
                 <Table size="small">
-                  <TableHead><TableRow><TableCell>Name</TableCell><TableCell>Mode</TableCell><TableCell>Order</TableCell>{canAdmin && <TableCell>Actions</TableCell>}</TableRow></TableHead>
+                  <TableHead><TableRow>
+                    <TableCell>Name</TableCell><TableCell>Mode</TableCell><TableCell>Order</TableCell>
+                    {canAdmin && <TableCell>Actions</TableCell>}
+                  </TableRow></TableHead>
                   <TableBody>{bodies.map(b => (
                     <TableRow key={b.id}>
                       <TableCell>{b.name}</TableCell>
                       <TableCell><Chip label={b.approvalMode} size="small" /></TableCell>
                       <TableCell>{b.order}</TableCell>
-                      {canAdmin && <TableCell><Button size="small" onClick={() => { setEditBody(b); setBodyOpen(true); }}>Edit</Button></TableCell>}
+                      {canAdmin && (
+                        <TableCell>
+                          <Button size="small" onClick={() => { setEditBody(b); setBodyOpen(true); }}>Edit</Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}</TableBody>
                 </Table>
@@ -135,20 +191,57 @@ export default function ClearancePage() {
             </Box>
           )}
 
+          {/* ── Clearance Board tab ──────────────────────────────────────── */}
           {tab === 1 && (
             <Box>
-              <Stack direction="row" spacing={2} sx={{ mb: 2 }} alignItems="center">
-                <TextField label="Employee ID to Initiate" size="small" value={initiateEmpId} onChange={e => setInitiateEmpId(e.target.value)} />
-                <Button variant="outlined" color="warning" onClick={() => initiate.mutate(initiateEmpId)} disabled={!initiateEmpId}>Initiate Clearance</Button>
-                <TextField label="Load Employee ID" size="small" value={loadEmpId} onChange={e => setLoadEmpId(e.target.value)} />
-                <Button variant="outlined" onClick={() => setActiveEmpId(loadEmpId)} disabled={!loadEmpId}>Load</Button>
+              <Stack direction="row" spacing={2} sx={{ mb: 2 }} alignItems="center" flexWrap="wrap">
+                <TextField
+                  label="Employee ID to Initiate"
+                  size="small"
+                  value={initiateEmpId}
+                  onChange={e => setInitiateEmpId(e.target.value)}
+                />
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  onClick={() => { setBoardError(""); initiate.mutate(initiateEmpId); }}
+                  disabled={!initiateEmpId || initiate.isPending}
+                >
+                  Initiate Clearance
+                </Button>
+                <TextField
+                  label="Load Employee ID"
+                  size="small"
+                  value={loadEmpId}
+                  onChange={e => setLoadEmpId(e.target.value)}
+                />
+                <Button
+                  variant="outlined"
+                  onClick={() => { setBoardError(""); setActiveEmpId(loadEmpId); }}
+                  disabled={!loadEmpId}
+                >
+                  Load
+                </Button>
               </Stack>
+
+              {boardError && (
+                <Alert
+                  severity="error"
+                  sx={{ mb: 2 }}
+                  action={<Button size="small" color="inherit" onClick={() => setBoardError("")}>Dismiss</Button>}
+                >
+                  {boardError}
+                </Alert>
+              )}
 
               {record && (
                 <Paper variant="outlined" sx={{ p: 2 }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                     <Typography variant="h6">Employee: {record.employeeId}</Typography>
-                    <Chip label={record.status} color={record.status === "COMPLETED" ? "success" : "warning"} />
+                    <Chip
+                      label={record.status}
+                      color={record.status === "COMPLETED" ? "success" : "warning"}
+                    />
                   </Stack>
                   <Table size="small">
                     <TableHead><TableRow>
@@ -158,14 +251,25 @@ export default function ClearancePage() {
                     <TableBody>{record.tasks.map(task => (
                       <TableRow key={task.id}>
                         <TableCell>{task.clearanceBody.name}</TableCell>
-                        <TableCell><Chip label={task.status} color={taskStatusColor(task.status) as any} size="small" /></TableCell>
+                        <TableCell>
+                          <Chip label={task.status} color={taskStatusColor(task.status) as any} size="small" />
+                        </TableCell>
                         <TableCell>{task.approvedBy ?? "—"}</TableCell>
                         <TableCell>{task.rejectionReason ?? "—"}</TableCell>
                         <TableCell>
                           {task.status === "ACTIVE" && (
                             <Stack direction="row" spacing={0.5}>
-                              <Button size="small" color="success" onClick={() => approve.mutate(task.id)}>Approve</Button>
-                              <Button size="small" color="error" onClick={() => setRejectTask(task)}>Reject</Button>
+                              <Button
+                                size="small"
+                                color="success"
+                                onClick={() => approve.mutate(task.id)}
+                                disabled={approve.isPending}
+                              >
+                                Approve
+                              </Button>
+                              <Button size="small" color="error" onClick={() => setRejectTask(task)}>
+                                Reject
+                              </Button>
                             </Stack>
                           )}
                         </TableCell>

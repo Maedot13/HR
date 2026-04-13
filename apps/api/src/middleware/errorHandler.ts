@@ -29,8 +29,10 @@ export function errorHandler(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ): void {
-  // 1. Log the raw error internally for visibility & debugging
-  console.error(`[ErrorHandler] ${req.method} ${req.url} - Error:`, err);
+  // 1. Log the raw error internally — dev only to avoid production stdout noise
+  if (process.env.NODE_ENV !== "production") {
+    console.error(`[ErrorHandler] ${req.method} ${req.url} - Error:`, err);
+  }
 
   // 2. Handle Expected Operational Errors (AppError)
   if (err instanceof AppError) {
@@ -45,16 +47,22 @@ export function errorHandler(
   }
 
   // 3. Handle Validation Errors (Zod)
+  // SECURITY (Rule 6): Strip internal Zod fields (received, expected, code, minimum,
+  // type, inclusive, exact) — only expose path + message to avoid leaking schema structure.
+  // Migration note: details shape changed from raw ZodIssue[] to { path, message }[].
+  // Confirmed zero frontend consumers of stripped fields before applying (Option A, in-place).
   if (
     err instanceof Error &&
     err.name === "ZodError" &&
     "issues" in err
   ) {
+    type ZodIssue = { path: (string | number)[]; message: string };
+    const rawIssues = (err as { issues: ZodIssue[] }).issues;
     res.status(422).json({
       error: {
         code: "VALIDATION_ERROR",
-        message: "Invalid input provided. Please check the data and try again.",
-        details: (err as { issues: unknown }).issues,
+        message: "Some fields have invalid values. Please review the highlighted fields and try again.",
+        details: rawIssues.map((i) => ({ path: i.path, message: i.message })),
       },
     });
     return;
@@ -67,7 +75,7 @@ export function errorHandler(
       res.status(409).json({
         error: {
           code: "CONFLICT",
-          message: "A record with this specific data already exists.",
+          message: "This record already exists. Please check for duplicates and try again.",
         },
       });
       return;
@@ -76,7 +84,7 @@ export function errorHandler(
       res.status(404).json({
         error: {
           code: "NOT_FOUND",
-          message: "The requested record was not found.",
+          message: "The record you requested could not be found. It may have been deleted or never existed.",
         },
       });
       return;
@@ -93,7 +101,7 @@ export function errorHandler(
     res.status(500).json({
       error: {
         code: "DATABASE_ERROR",
-        message: "Database service temporarily unavailable.",
+        message: "The system could not reach the database. Please wait a moment and try again. If the problem continues, contact your system administrator.",
       },
     });
     return;
@@ -104,7 +112,7 @@ export function errorHandler(
     res.status(503).json({
       error: {
         code: "EXTERNAL_API_FAILURE",
-        message: "Failed to communicate with an external service. Please try again later.",
+        message: "One of the connected services is currently unavailable. Please try again in a few minutes.",
       },
     });
     return;
@@ -115,7 +123,7 @@ export function errorHandler(
   res.status(500).json({
     error: {
       code: "INTERNAL_SERVER_ERROR",
-      message: "An unexpected error occurred. Please try again later.",
+      message: "Something went wrong on our end. Please try again. If the problem persists, contact your system administrator.",
     },
   });
 }

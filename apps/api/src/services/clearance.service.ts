@@ -33,7 +33,7 @@ export async function listBodies() {
 
 export async function updateBody(id: string, data: Partial<{ name: string; approvalMode: "SEQUENTIAL" | "PARALLEL"; order: number }>, actor: ActorContext) {
   const existing = await prisma.clearanceBody.findUnique({ where: { id } });
-  if (!existing) throw new AppError(404, "NOT_FOUND", "ClearanceBody not found");
+  if (!existing) throw new AppError(404, "NOT_FOUND", "Clearance body not found. It may have been deleted. Please refresh and try again.");
   const updated = await prisma.clearanceBody.update({ where: { id }, data });
   await logActivity({ actingUserId: actor.userId, actingRole: actor.role, actionType: "CLEARANCE_BODY_UPDATED", resourceType: "ClearanceBody", resourceId: id, previousState: existing, newState: updated, ipAddress: actor.ipAddress });
   return updated;
@@ -41,13 +41,13 @@ export async function updateBody(id: string, data: Partial<{ name: string; appro
 
 export async function initiateClearance(employeeId: string, actor: ActorContext) {
   const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
-  if (!employee) throw new AppError(404, "NOT_FOUND", "Employee not found");
+  if (!employee) throw new AppError(404, "NOT_FOUND", "Employee record not found. Please verify the Employee ID and try again.");
 
   const existing = await prisma.clearanceRecord.findUnique({ where: { employeeId } });
-  if (existing) throw new AppError(409, "CLEARANCE_ALREADY_EXISTS", "Clearance already initiated for this employee");
+  if (existing) throw new AppError(409, "CLEARANCE_ALREADY_EXISTS", "A clearance process has already been started for this employee. Please load the existing record to continue.");
 
   const bodies = await prisma.clearanceBody.findMany({ orderBy: { order: "asc" } });
-  if (bodies.length === 0) throw new AppError(422, "NO_CLEARANCE_BODIES", "No clearance bodies configured");
+  if (bodies.length === 0) throw new AppError(422, "NO_CLEARANCE_BODIES", "No clearance bodies have been configured yet. Please set up clearance bodies in the Clearance Bodies tab before initiating a clearance process.");
 
   const seqBodies = bodies.filter((b: { approvalMode: string; order: number }) => b.approvalMode === "SEQUENTIAL");
   const minSeqOrder = seqBodies.length > 0 ? Math.min(...seqBodies.map((b: { order: number }) => b.order)) : Infinity;
@@ -80,8 +80,8 @@ export async function approveTask(taskId: string, actor: ActorContext) {
     where: { id: taskId },
     include: { ClearanceBody: true, ClearanceRecord: { include: { ClearanceTask: { include: { ClearanceBody: true } } } } },
   });
-  if (!task) throw new AppError(404, "NOT_FOUND", "ClearanceTask not found");
-  if (task.status !== "ACTIVE") throw new AppError(422, "INVALID_STATUS", "Only ACTIVE tasks can be approved");
+  if (!task) throw new AppError(404, "NOT_FOUND", "Clearance task not found. Please refresh the page and try again.");
+  if (task.status !== "ACTIVE") throw new AppError(422, "INVALID_STATUS", "This task has already been completed and cannot be approved again. Only active tasks can be approved.");
 
   const updatedTask = await prisma.clearanceTask.update({
     where: { id: taskId },
@@ -114,8 +114,8 @@ export async function approveTask(taskId: string, actor: ActorContext) {
 
 export async function rejectTask(taskId: string, rejectionReason: string, actor: ActorContext) {
   const task = await prisma.clearanceTask.findUnique({ where: { id: taskId } });
-  if (!task) throw new AppError(404, "NOT_FOUND", "ClearanceTask not found");
-  if (task.status !== "ACTIVE") throw new AppError(422, "INVALID_STATUS", "Only ACTIVE tasks can be rejected");
+  if (!task) throw new AppError(404, "NOT_FOUND", "Clearance task not found. Please refresh the page and try again.");
+  if (task.status !== "ACTIVE") throw new AppError(422, "INVALID_STATUS", "This task has already been completed and cannot be rejected again. Only active tasks can be rejected.");
 
   const updated = await prisma.clearanceTask.update({ where: { id: taskId }, data: { status: "REJECTED", rejectionReason } });
   await logActivity({ actingUserId: actor.userId, actingRole: actor.role, actionType: "CLEARANCE_TASK_REJECTED", resourceType: "ClearanceTask", resourceId: taskId, previousState: { status: "ACTIVE" }, newState: { status: "REJECTED", rejectionReason }, ipAddress: actor.ipAddress });
@@ -124,6 +124,6 @@ export async function rejectTask(taskId: string, rejectionReason: string, actor:
 
 export async function getClearanceRecord(employeeId: string) {
   const record = await prisma.clearanceRecord.findUnique({ where: { employeeId }, include: { ClearanceTask: { include: { ClearanceBody: true } } } });
-  if (!record) throw new AppError(404, "NOT_FOUND", "No clearance record found for this employee");
+  if (!record) throw new AppError(404, "NOT_FOUND", "No clearance record found for this employee. Use 'Initiate Clearance' to start the process.");
   return record;
 }

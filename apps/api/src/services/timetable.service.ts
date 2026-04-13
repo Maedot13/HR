@@ -37,7 +37,7 @@ export async function createEntry(data: CreateEntryData, actor: ActorContext) {
   });
 
   if (overlapping) {
-    throw new AppError(409, "SCHEDULE_CONFLICT", "Schedule conflict detected", {
+    throw new AppError(409, "SCHEDULE_CONFLICT", "This time slot overlaps with an existing schedule entry. Please choose a different time or day.", {
       conflictingEntry: {
         id: overlapping.id,
         course: overlapping.course,
@@ -68,7 +68,7 @@ export async function updateEntry(
   actor: ActorContext
 ) {
   const existing = await prisma.scheduleEntry.findUnique({ where: { id } });
-  if (!existing) throw new AppError(404, "NOT_FOUND", "Schedule entry not found");
+  if (!existing) throw new AppError(404, "NOT_FOUND", "Schedule entry not found. It may have been deleted. Please refresh and try again.");
 
   const updated = await prisma.scheduleEntry.update({ where: { id }, data });
 
@@ -88,7 +88,7 @@ export async function updateEntry(
 
 export async function deleteEntry(id: string, actor: ActorContext) {
   const existing = await prisma.scheduleEntry.findUnique({ where: { id } });
-  if (!existing) throw new AppError(404, "NOT_FOUND", "Schedule entry not found");
+  if (!existing) throw new AppError(404, "NOT_FOUND", "Schedule entry not found. It may have been deleted. Please refresh and try again.");
 
   await prisma.scheduleEntry.delete({ where: { id } });
 

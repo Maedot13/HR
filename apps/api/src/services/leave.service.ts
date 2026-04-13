@@ -74,10 +74,10 @@ export async function submitApplication(
     where: { id: employeeId },
     include: { UserRole: true },
   });
-  if (!employee) throw new AppError(404, "NOT_FOUND", "Employee not found");
+  if (!employee) throw new AppError(404, "NOT_FOUND", "Employee record not found. Please verify the Employee ID and try again.");
 
   const leaveType = await prisma.leaveType.findUnique({ where: { id: data.leaveTypeId } });
-  if (!leaveType) throw new AppError(404, "NOT_FOUND", "Leave type not found");
+  if (!leaveType) throw new AppError(404, "NOT_FOUND", "The selected leave type could not be found. Please choose a different type or contact HR.");
 
   const start = new Date(data.startDate);
   const end = new Date(data.endDate);
@@ -93,7 +93,7 @@ export async function submitApplication(
     const svc = employee.hireDate ? yearsOfService(employee.hireDate) : 0;
     if (svc < 3) unmet.push("requires at least 3 consecutive years of service");
     if (unmet.length > 0) {
-      throw new AppError(422, "LEAVE_ELIGIBILITY_FAILED", "Research leave eligibility not met", { unmetCriteria: unmet });
+      throw new AppError(422, "LEAVE_ELIGIBILITY_FAILED", "You do not meet the eligibility requirements for Research Leave. Please contact HR for details.", { unmetCriteria: unmet });
     }
   }
 
@@ -108,13 +108,13 @@ export async function submitApplication(
     const svc = employee.hireDate ? yearsOfService(employee.hireDate) : 0;
     if (svc < 6) unmet.push("requires at least 6 continuous years of service");
     if (unmet.length > 0) {
-      throw new AppError(422, "LEAVE_ELIGIBILITY_FAILED", "Sabbatical leave eligibility not met", { unmetCriteria: unmet });
+      throw new AppError(422, "LEAVE_ELIGIBILITY_FAILED", "You do not meet the eligibility requirements for Sabbatical Leave. Please contact HR for details.", { unmetCriteria: unmet });
     }
   }
 
   if (leaveType.name === "LEAVE_WITHOUT_PAY") {
     if (actor.specialPrivilege !== "UNIVERSITY_PRESIDENT") {
-      throw new AppError(403, "LEAVE_ELIGIBILITY_FAILED", "Leave without pay requires University President approval");
+      throw new AppError(403, "LEAVE_ELIGIBILITY_FAILED", "Leave without pay requires approval from the University President. Please submit your request through the appropriate channel.");
     }
   }
 
@@ -147,7 +147,7 @@ export async function submitApplication(
 
     const MAX_SICK_DAYS = 8 * 30; // ~8 months in calendar days
     if (usedDays + requestedDays > MAX_SICK_DAYS) {
-      throw new AppError(422, "SICK_LEAVE_CAP_EXCEEDED", "Total sick leave would exceed the 8-month cap within a 12-month period");
+      throw new AppError(422, "SICK_LEAVE_CAP_EXCEEDED", "This request would exceed the maximum sick leave allowed (8 months within any 12-month period). Please contact HR to review your leave balance.");
     }
   }
 
@@ -168,7 +168,7 @@ export async function submitApplication(
     });
     const currentBalance = balance?.balance ?? 0;
     if (currentBalance < requestedDays) {
-      throw new AppError(422, "INSUFFICIENT_LEAVE_BALANCE", "Insufficient leave balance", {
+      throw new AppError(422, "INSUFFICIENT_LEAVE_BALANCE", "You do not have enough leave days remaining for this request.", {
         currentBalance,
         shortfall: requestedDays - currentBalance,
       });
@@ -205,9 +205,9 @@ export async function approveApplication(applicationId: string, actor: ActorCont
     where: { id: applicationId },
     include: { LeaveType: true },
   });
-  if (!application) throw new AppError(404, "NOT_FOUND", "Leave application not found");
+  if (!application) throw new AppError(404, "NOT_FOUND", "Leave application not found. It may have been withdrawn or never submitted.");
   if (application.status !== "PENDING") {
-    throw new AppError(422, "INVALID_STATUS", "Only pending applications can be approved");
+    throw new AppError(422, "INVALID_STATUS", "This application has already been reviewed and can no longer be approved. Only pending applications can be approved.");
   }
 
   const start = application.startDate;
@@ -255,9 +255,9 @@ export async function rejectApplication(
   actor: ActorContext
 ) {
   const application = await prisma.leaveApplication.findUnique({ where: { id: applicationId } });
-  if (!application) throw new AppError(404, "NOT_FOUND", "Leave application not found");
+  if (!application) throw new AppError(404, "NOT_FOUND", "Leave application not found. It may have been withdrawn or never submitted.");
   if (application.status !== "PENDING") {
-    throw new AppError(422, "INVALID_STATUS", "Only pending applications can be rejected");
+    throw new AppError(422, "INVALID_STATUS", "This application has already been reviewed and can no longer be rejected. Only pending applications can be rejected.");
   }
 
   const updated = await prisma.leaveApplication.update({

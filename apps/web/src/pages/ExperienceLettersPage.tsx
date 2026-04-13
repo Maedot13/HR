@@ -19,7 +19,7 @@ function GenerateForm({ onClose }: { onClose: () => void }) {
   const save = useMutation({
     mutationFn: () => api.post(`/employees/${form.employeeId}/experience-letter`, { format: form.format }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["experience-letters"] }); onClose(); },
-    onError: (e: any) => setError(e.response?.data?.error?.message ?? "Error"),
+    onError: (e: any) => setError(e.response?.data?.error?.message ?? "Unable to generate the experience letter. Please check the Employee ID and try again."),
   });
 
   return (

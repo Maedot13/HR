@@ -21,7 +21,7 @@ function EntryForm({ entry, onClose }: { entry: ScheduleEntry | null; onClose: (
   const save = useMutation({
     mutationFn: () => entry ? api.put(`/schedule/${entry.id}`, form) : api.post("/schedule", form),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["schedule"] }); onClose(); },
-    onError: (e: any) => setError(e.response?.data?.error?.message ?? "Error"),
+    onError: (e: any) => setError(e.response?.data?.error?.message ?? "Unable to save this schedule entry. Check for time conflicts and try again."),
   });
 
   return (
@@ -51,7 +51,7 @@ function SubstitutionForm({ entry, onClose }: { entry: ScheduleEntry; onClose: (
   const save = useMutation({
     mutationFn: () => api.post(`/schedule/${entry.id}/substitution`, form),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["schedule"] }); onClose(); },
-    onError: (e: any) => setError(e.response?.data?.error?.message ?? "Error"),
+    onError: (e: any) => setError(e.response?.data?.error?.message ?? "Unable to record the substitution. Please verify the substitute employee ID and date, then try again."),
   });
 
   return (
@@ -80,9 +80,12 @@ export default function TimetablePage() {
     enabled: !!empFilter,
   });
 
+  const [deleteError, setDeleteError] = useState("");
+
   const del = useMutation({
     mutationFn: (id: string) => api.delete(`/schedule/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["schedule"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["schedule"] }); setDeleteError(""); },
+    onError: (e: any) => setDeleteError(e.response?.data?.error?.message ?? "Unable to delete this entry. Please try again."),
   });
 
   const entries: ScheduleEntry[] = data?.data ?? [];
@@ -98,7 +101,12 @@ export default function TimetablePage() {
         {!isEmployee && <Button variant="contained" onClick={() => setCreateOpen(true)}>Add Entry</Button>}
       </Stack>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>Failed to load schedule</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>Failed to load the timetable. Check your connection and try again.</Alert>}
+      {deleteError && (
+        <Alert severity="error" sx={{ mb: 2 }} action={<Button size="small" color="inherit" onClick={() => setDeleteError("")}>Dismiss</Button>}>
+          {deleteError}
+        </Alert>
+      )}
       {isLoading ? <Typography>Loading...</Typography> : (
         <Paper sx={{ mb: 3, overflowX: "auto" }}>
           <Table size="small">

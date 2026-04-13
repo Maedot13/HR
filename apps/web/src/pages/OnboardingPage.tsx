@@ -14,20 +14,24 @@ function WorkflowDetail({ workflow }: { workflow: OnboardingWorkflow }) {
   const qc = useQueryClient();
   const [completeError, setCompleteError] = useState("");
 
+  const [toggleError, setToggleError] = useState("");
+
   const toggleDoc = useMutation({
     mutationFn: (docId: string) => api.put(`/onboarding/${workflow.id}/documents/${docId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["onboarding", workflow.id] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["onboarding", workflow.id] }); setToggleError(""); },
+    onError: () => setToggleError("Unable to update document status. Please try again."),
   });
 
   const toggleAsset = useMutation({
     mutationFn: (assetId: string) => api.put(`/onboarding/${workflow.id}/assets/${assetId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["onboarding", workflow.id] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["onboarding", workflow.id] }); setToggleError(""); },
+    onError: () => setToggleError("Unable to update asset status. Please try again."),
   });
 
   const complete = useMutation({
     mutationFn: () => api.post(`/onboarding/${workflow.id}/complete`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["onboarding", workflow.id] }),
-    onError: (e: any) => setCompleteError(e.response?.data?.error?.message ?? "Cannot complete onboarding"),
+    onError: (e: any) => setCompleteError(e.response?.data?.error?.message ?? "Unable to complete onboarding. Ensure all documents have been collected and all assets have been assigned, then try again."),
   });
 
   return (
@@ -63,6 +67,11 @@ function WorkflowDetail({ workflow }: { workflow: OnboardingWorkflow }) {
         ))}</TableBody>
       </Table>
 
+      {toggleError && (
+        <Alert severity="error" sx={{ mb: 1 }} action={<Button size="small" color="inherit" onClick={() => setToggleError("")}>Dismiss</Button>}>
+          {toggleError}
+        </Alert>
+      )}
       {completeError && <Alert severity="error" sx={{ mb: 1 }}>{completeError}</Alert>}
       {workflow.status !== "COMPLETED" && (
         <Button variant="contained" color="success" onClick={() => { setCompleteError(""); complete.mutate(); }} disabled={complete.isPending}>

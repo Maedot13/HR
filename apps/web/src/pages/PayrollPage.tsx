@@ -19,14 +19,26 @@ function GenerateForm({ onClose }: { onClose: () => void }) {
   const save = useMutation({
     mutationFn: () => api.post("/payroll/reports", { period }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["payroll-reports"] }); onClose(); },
-    onError: (e: any) => setError(e.response?.data?.error?.message ?? "Error"),
+    onError: (e: any) => setError(
+      e.response?.data?.error?.message ??
+      "Unable to generate report. Check the period format (e.g. 2026-03) and try again."
+    ),
   });
 
   return (
     <Stack spacing={2} sx={{ mt: 1 }}>
       {error && <Alert severity="error">{error}</Alert>}
-      <TextField label="Period (e.g. 2026-03)" value={period} onChange={e => setPeriod(e.target.value)} required />
-      <Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending}>Generate Report</Button>
+      <TextField
+        label="Payroll Period"
+        placeholder="e.g. 2026-03"
+        value={period}
+        onChange={e => setPeriod(e.target.value)}
+        helperText="Year and month in the format YYYY-MM"
+        required
+      />
+      <Button variant="contained" onClick={() => save.mutate()} disabled={save.isPending}>
+        Generate Report
+      </Button>
     </Stack>
   );
 }
@@ -37,6 +49,8 @@ export default function PayrollPage() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [exportFormat, setExportFormat] = useState("EXCEL");
+  // Shared error banner for inline mutations (export, validate)
+  const [actionError, setActionError] = useState("");
 
   const canGenerate = user?.role !== "EMPLOYEE";
   const canValidate = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
@@ -47,13 +61,26 @@ export default function PayrollPage() {
   });
 
   const exportReport = useMutation({
-    mutationFn: ({ id, format }: { id: string; format: string }) => api.post(`/payroll/reports/${id}/export`, { format }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["payroll-reports"] }); setExportingId(null); },
+    mutationFn: ({ id, format }: { id: string; format: string }) =>
+      api.post(`/payroll/reports/${id}/export`, { format }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["payroll-reports"] });
+      setExportingId(null);
+      setActionError("");
+    },
+    onError: (e: any) => setActionError(
+      e.response?.data?.error?.message ??
+      "Export failed. Try a different format or check your connection and try again."
+    ),
   });
 
   const validate = useMutation({
     mutationFn: (id: string) => api.put(`/payroll/reports/${id}/validate`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["payroll-reports"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["payroll-reports"] }); setActionError(""); },
+    onError: (e: any) => setActionError(
+      e.response?.data?.error?.message ??
+      "Validation failed. Ensure the report is complete and try again."
+    ),
   });
 
   const reports: PayrollReport[] = data?.data ?? [];
@@ -62,9 +89,27 @@ export default function PayrollPage() {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>Payroll Reporting</Typography>
-      {canGenerate && <Button variant="contained" onClick={() => setGenerateOpen(true)} sx={{ mb: 2 }}>Generate Report</Button>}
+      {canGenerate && (
+        <Button variant="contained" onClick={() => setGenerateOpen(true)} sx={{ mb: 2 }}>
+          Generate Report
+        </Button>
+      )}
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>Failed to load reports</Alert>}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Failed to load reports. Check your connection and try again.
+        </Alert>
+      )}
+      {actionError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={<Button size="small" color="inherit" onClick={() => setActionError("")}>Dismiss</Button>}
+        >
+          {actionError}
+        </Alert>
+      )}
+
       {isLoading ? <Typography>Loading...</Typography> : (
         <Paper>
           <Table size="small">
@@ -80,22 +125,35 @@ export default function PayrollPage() {
                 <TableCell>
                   <Stack direction="row" spacing={0.5}>
                     {(r.exports ?? []).map(ex => (
-                      <Button key={ex.format} size="small" variant="outlined" href={ex.fileUrl} target="_blank">{ex.format}</Button>
+                      <Button key={ex.format} size="small" variant="outlined" href={ex.fileUrl} target="_blank">
+                        {ex.format}
+                      </Button>
                     ))}
                   </Stack>
                 </TableCell>
                 <TableCell>
                   <Stack direction="row" spacing={0.5}>
-                    <Button size="small" onClick={() => setExportingId(r.id)}>Export</Button>
+                    <Button size="small" onClick={() => { setActionError(""); setExportingId(r.id); }}>
+                      Export
+                    </Button>
                     {canValidate && r.status !== "VALIDATED" && (
-                      <Button size="small" color="success" onClick={() => validate.mutate(r.id)}>Validate</Button>
+                      <Button
+                        size="small"
+                        color="success"
+                        onClick={() => validate.mutate(r.id)}
+                        disabled={validate.isPending}
+                      >
+                        Validate
+                      </Button>
                     )}
                   </Stack>
                 </TableCell>
               </TableRow>
             ))}</TableBody>
           </Table>
-          {reports.length === 0 && <Typography sx={{ p: 2, textAlign: "center", color: "text.secondary" }}>No reports yet</Typography>}
+          {reports.length === 0 && (
+            <Typography sx={{ p: 2, textAlign: "center", color: "text.secondary" }}>No reports yet</Typography>
+          )}
         </Paper>
       )}
 
@@ -105,7 +163,7 @@ export default function PayrollPage() {
         <DialogActions><Button onClick={() => setGenerateOpen(false)}>Cancel</Button></DialogActions>
       </Dialog>
 
-      <Dialog open={!!exportingId} onClose={() => setExportingId(null)} maxWidth="xs" fullWidth>
+      <Dialog open={!!exportingId} onClose={() => { setExportingId(null); setActionError(""); }} maxWidth="xs" fullWidth>
         <DialogTitle>Export Report</DialogTitle>
         <DialogContent>
           <FormControl fullWidth sx={{ mt: 1 }}>
@@ -118,8 +176,14 @@ export default function PayrollPage() {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setExportingId(null)}>Cancel</Button>
-          <Button variant="contained" onClick={() => exportingId && exportReport.mutate({ id: exportingId, format: exportFormat })} disabled={exportReport.isPending}>Export</Button>
+          <Button onClick={() => { setExportingId(null); setActionError(""); }}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => exportingId && exportReport.mutate({ id: exportingId, format: exportFormat })}
+            disabled={exportReport.isPending}
+          >
+            Export
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
