@@ -8,7 +8,7 @@ datasource db {
 }
 
 model ActivityLog {
-  id            String   @id @default(uuid())
+  id String @id @default(uuid())
   actingUserId  String
   actingRole    String
   actionType    String
@@ -22,7 +22,7 @@ model ActivityLog {
 }
 
 model Application {
-  id                   String             @id @default(uuid())
+  id String @id @default(uuid())
   jobPostingId         String
   candidateName        String
   candidateEmail       String
@@ -34,7 +34,7 @@ model Application {
 }
 
 model ApplicationStage {
-  id             String           @id @default(uuid())
+  id String @id @default(uuid())
   applicationId  String
   stage          RecruitmentStage
   transitionedAt DateTime         @default(now())
@@ -43,7 +43,7 @@ model ApplicationStage {
 }
 
 model AssetAssignment {
-  id                   String             @id @default(uuid())
+  id String @id @default(uuid())
   onboardingWorkflowId String
   assetName            String
   assignedAt           DateTime?
@@ -52,18 +52,18 @@ model AssetAssignment {
 }
 
 model Campus {
-  id                String              @id @default(uuid())
+  id String @id @default(uuid())
   code              String              @unique
   name              String
   createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  updatedAt         DateTime
   College           College[]
   Employee          Employee[]
   EmployeeIDCounter EmployeeIDCounter[]
 }
 
 model ClearanceBody {
-  id            String          @id @default(uuid())
+  id String @id @default(uuid())
   name          String          @unique
   approvalMode  ApprovalMode    @default(PARALLEL)
   order         Int
@@ -71,7 +71,7 @@ model ClearanceBody {
 }
 
 model ClearanceRecord {
-  id            String          @id @default(uuid())
+  id String @id @default(uuid())
   employeeId    String          @unique
   status        ClearanceStatus @default(IN_PROGRESS)
   initiatedAt   DateTime        @default(now())
@@ -81,20 +81,20 @@ model ClearanceRecord {
 }
 
 model ClearanceTask {
-  id                String              @id @default(uuid())
+  id String @id @default(uuid())
   clearanceRecordId String
   clearanceBodyId   String
   status            ClearanceTaskStatus @default(PENDING)
   approvedBy        String?
   approvedAt        DateTime?
   rejectionReason   String?
-  updatedAt         DateTime            @updatedAt
+  updatedAt         DateTime
   ClearanceBody     ClearanceBody       @relation(fields: [clearanceBodyId], references: [id])
   ClearanceRecord   ClearanceRecord     @relation(fields: [clearanceRecordId], references: [id])
 }
 
 model College {
-  id         String       @id @default(uuid())
+  id String @id @default(uuid())
   name       String
   campusId   String
   Campus     Campus       @relation(fields: [campusId], references: [id])
@@ -102,7 +102,7 @@ model College {
 }
 
 model Department {
-  id        String     @id @default(uuid())
+  id String @id @default(uuid())
   name      String
   collegeId String
   College   College    @relation(fields: [collegeId], references: [id])
@@ -111,7 +111,7 @@ model Department {
 }
 
 model Employee {
-  id                 String               @id @default(uuid())
+  id String @id @default(uuid())
   employeeId         String               @unique
   fullName           String
   dateOfBirth        DateTime
@@ -129,7 +129,8 @@ model Employee {
   passwordHash       String
   isTempPassword     Boolean              @default(true)
   createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  updatedAt          DateTime
+  email              String               @unique
   ActivityLog        ActivityLog[]
   ClearanceRecord    ClearanceRecord?
   Campus             Campus               @relation(fields: [campusId], references: [id])
@@ -144,11 +145,10 @@ model Employee {
   ScheduleEntry      ScheduleEntry[]
   TrainingAssignment TrainingAssignment[]
   UserRole           UserRole?
-  email String @unique
 }
 
 model EmployeeDocument {
-  id           String   @id @default(uuid())
+  id String @id @default(uuid())
   employeeId   String
   documentType String
   fileUrl      String
@@ -158,7 +158,7 @@ model EmployeeDocument {
 }
 
 model EmployeeIDCounter {
-  id       String @id @default(uuid())
+  id String @id @default(uuid())
   campusId String
   year     Int
   sequence Int    @default(0)
@@ -168,7 +168,7 @@ model EmployeeIDCounter {
 }
 
 model EmploymentHistory {
-  id            String   @id @default(uuid())
+  id String @id @default(uuid())
   employeeId    String
   changeType    String
   previousValue String?
@@ -179,19 +179,19 @@ model EmploymentHistory {
 }
 
 model Evaluation {
-  id               String   @id @default(uuid())
+  id String @id @default(uuid())
   employeeId       String
   evaluationPeriod String
   efficiencyScore  Float
   workOutputScore  Float
   createdBy        String
   createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  updatedAt        DateTime
   Employee         Employee @relation(fields: [employeeId], references: [id])
 }
 
 model ExperienceLetter {
-  id          String       @id @default(uuid())
+  id String @id @default(uuid())
   employeeId  String
   generatedBy String
   generatedAt DateTime     @default(now())
@@ -201,7 +201,7 @@ model ExperienceLetter {
 }
 
 model JobPosting {
-  id           String        @id @default(uuid())
+  id String @id @default(uuid())
   type         PostingType
   title        String
   description  String
@@ -214,7 +214,7 @@ model JobPosting {
 }
 
 model LeaveApplication {
-  id              String      @id @default(uuid())
+  id String @id @default(uuid())
   employeeId      String
   leaveTypeId     String
   startDate       DateTime
@@ -231,7 +231,7 @@ model LeaveApplication {
 }
 
 model LeaveBalance {
-  id          String    @id @default(uuid())
+  id String @id @default(uuid())
   employeeId  String
   leaveTypeId String
   balance     Float     @default(0)
@@ -243,7 +243,7 @@ model LeaveBalance {
 }
 
 model LeaveType {
-  id               String             @id @default(uuid())
+  id String @id @default(uuid())
   name             LeaveTypeName      @unique
   description      String
   maxDays          Int?
@@ -253,7 +253,7 @@ model LeaveType {
 }
 
 model OnboardingDocument {
-  id                   String             @id @default(uuid())
+  id String @id @default(uuid())
   onboardingWorkflowId String
   documentType         String
   isCollected          Boolean            @default(false)
@@ -262,7 +262,7 @@ model OnboardingDocument {
 }
 
 model OnboardingWorkflow {
-  id                 String               @id @default(uuid())
+  id String @id @default(uuid())
   applicationId      String               @unique
   status             OnboardingStatus     @default(PENDING)
   createdAt          DateTime             @default(now())
@@ -271,7 +271,7 @@ model OnboardingWorkflow {
 }
 
 model PayrollExport {
-  id              String              @id @default(uuid())
+  id String @id @default(uuid())
   payrollReportId String
   format          PayrollExportFormat
   fileUrl         String
@@ -280,7 +280,7 @@ model PayrollExport {
 }
 
 model PayrollReport {
-  id            String          @id @default(uuid())
+  id String @id @default(uuid())
   period        String
   generatedBy   String
   generatedAt   DateTime        @default(now())
@@ -289,7 +289,7 @@ model PayrollReport {
 }
 
 model Permission {
-  id                  String                @id @default(uuid())
+  id String @id @default(uuid())
   code                String                @unique
   description         String
   PrivilegePermission PrivilegePermission[]
@@ -297,7 +297,7 @@ model Permission {
 }
 
 model PrivilegePermission {
-  id           String           @id @default(uuid())
+  id String @id @default(uuid())
   privilege    SpecialPrivilege
   permissionId String
   Permission   Permission       @relation(fields: [permissionId], references: [id])
@@ -306,7 +306,7 @@ model PrivilegePermission {
 }
 
 model RolePermission {
-  id           String     @id @default(uuid())
+  id String @id @default(uuid())
   role         BaseRole
   permissionId String
   Permission   Permission @relation(fields: [permissionId], references: [id])
@@ -315,7 +315,7 @@ model RolePermission {
 }
 
 model ScheduleEntry {
-  id           String         @id @default(uuid())
+  id String @id @default(uuid())
   employeeId   String
   course       String
   dayOfWeek    Int
@@ -328,7 +328,7 @@ model ScheduleEntry {
 }
 
 model Substitution {
-  id              String        @id @default(uuid())
+  id String @id @default(uuid())
   scheduleEntryId String
   substituteId    String
   sessionDate     DateTime
@@ -338,7 +338,7 @@ model Substitution {
 }
 
 model TrainingAssignment {
-  id                 String          @id @default(uuid())
+  id String @id @default(uuid())
   employeeId         String
   trainingProgramId  String
   assignedDate       DateTime        @default(now())
@@ -350,7 +350,7 @@ model TrainingAssignment {
 }
 
 model TrainingProgram {
-  id                 String               @id @default(uuid())
+  id String @id @default(uuid())
   title              String
   description        String
   competencies       String[]
@@ -358,7 +358,7 @@ model TrainingProgram {
 }
 
 model Unit {
-  id           String     @id @default(uuid())
+  id String @id @default(uuid())
   name         String
   departmentId String
   Employee     Employee[]
@@ -366,11 +366,11 @@ model Unit {
 }
 
 model UserRole {
-  id               String            @id @default(uuid())
+  id String @id @default(uuid())
   employeeId       String            @unique
   baseRole         BaseRole
   specialPrivilege SpecialPrivilege?
-  updatedAt        DateTime          @updatedAt
+  updatedAt        DateTime
   Employee         Employee          @relation(fields: [employeeId], references: [id])
 }
 

@@ -93,18 +93,18 @@ export async function createEmployee(
       nationality: data.nationality ?? "",
       contactInfo: (data.contactInfo as object) ?? {},
       emergencyContact: (data.emergencyContact as object) ?? {},
-      academicRank: data.academicRank as
+      academicRank: (data.academicRank || undefined) as
         | "LECTURER"
         | "ASSISTANT_PROFESSOR"
         | "ASSOCIATE_PROFESSOR"
-        | null
         | undefined,
-      departmentId: data.departmentId ?? undefined,
-      unitId: data.unitId ?? undefined,
+      departmentId: data.departmentId || undefined,
+      unitId: data.unitId || undefined,
       hireDate: data.hireDate ? new Date(data.hireDate) : undefined,
       passwordHash,
       isTempPassword: true,
       status: "PENDING",
+      email: (data.contactInfo as any)?.email || `${employeeId.toLowerCase()}@bdu.edu.et`,
     },
   });
 
@@ -187,9 +187,9 @@ export async function updateEmployee(
   if (data.nationality !== undefined) updateData.nationality = data.nationality;
   if (data.contactInfo !== undefined) updateData.contactInfo = data.contactInfo;
   if (data.emergencyContact !== undefined) updateData.emergencyContact = data.emergencyContact;
-  if (data.academicRank !== undefined) updateData.academicRank = data.academicRank;
-  if (data.departmentId !== undefined) updateData.departmentId = data.departmentId;
-  if (data.unitId !== undefined) updateData.unitId = data.unitId;
+  if (data.academicRank !== undefined) updateData.academicRank = data.academicRank || null;
+  if (data.departmentId !== undefined) updateData.departmentId = data.departmentId || null;
+  if (data.unitId !== undefined) updateData.unitId = data.unitId || null;
   if (data.hireDate !== undefined)
     updateData.hireDate = data.hireDate ? new Date(data.hireDate) : null;
 

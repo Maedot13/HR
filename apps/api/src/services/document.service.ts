@@ -10,8 +10,15 @@ export interface ActorContext {
   ipAddress: string;
 }
 
-function computeDuration(start: Date, end: Date): string {
+function computeDuration(start: Date | null, end: Date | null): string {
+  // Guard: Handle null dates
+  if (!start || !end) return "N/A";
+  
   const totalDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  
+  // Guard: Handle negative or zero duration
+  if (totalDays <= 0) return "0 days";
+  
   const years = Math.floor(totalDays / 365);
   const months = Math.floor((totalDays % 365) / 30);
   const days = totalDays % 30;
@@ -27,13 +34,22 @@ export async function generateExperienceLetter(employeeId: string, format: "PDF"
     where: { id: employeeId },
     include: { EmploymentHistory: { orderBy: { changedAt: "desc" } } },
   });
-  if (!employee) throw new AppError(404, "NOT_FOUND", "Employee not found");
+  
+  // IMPROVED: User-friendly error message
+  if (!employee) {
+    throw new AppError(404, "NOT_FOUND", "Unable to generate experience letter. Employee record not found.");
+  }
 
-  const mostRecentPosition = employee.EmploymentHistory.find((h: { changeType: string; newValue: string }) => h.changeType === "position");
+  // ADDED: Safe fallback for missing employment history
+  const employmentHistory = employee.EmploymentHistory ?? [];
+  const mostRecentPosition = employmentHistory.find((h: { changeType: string; newValue: string }) => h.changeType === "position");
   const positionTitle = mostRecentPosition?.newValue ?? "N/A";
+  
+  // ADDED: Safe date handling with fallbacks
   const hireDate = employee.hireDate ?? employee.createdAt;
   const endDate = employee.endDate ?? new Date();
   const duration = computeDuration(hireDate, endDate);
+  
   const fileUrl = `/letters/${employeeId}-${Date.now()}.${format.toLowerCase()}`;
 
   const letter = await prisma.experienceLetter.create({ data: { employeeId, generatedBy: actor.userId, format, fileUrl } });
@@ -45,6 +61,8 @@ export async function generateExperienceLetter(employeeId: string, format: "PDF"
 
 export async function listExperienceLetters(employeeId: string) {
   const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
-  if (!employee) throw new AppError(404, "NOT_FOUND", "Employee not found");
+  if (!employee) {
+    throw new AppError(404, "NOT_FOUND", "Unable to retrieve experience letters. Employee record not found.");
+  }
   return prisma.experienceLetter.findMany({ where: { employeeId }, orderBy: { generatedAt: "desc" } });
 }

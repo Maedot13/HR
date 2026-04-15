@@ -12,6 +12,7 @@ import ChangePasswordPage from "./pages/ChangePasswordPage.js";
 
 // Lazy-loaded module pages
 const OrgPage = lazy(() => import("./pages/OrgPage.js"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage.js"));
 const EmployeesPage = lazy(() => import("./pages/EmployeesPage.js"));
 const RecruitmentPage = lazy(() => import("./pages/RecruitmentPage.js"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage.js"));
@@ -51,7 +52,8 @@ export default function App() {
                     <Layout>
                       <Suspense fallback={<LoadingFallback />}>
                         <Routes>
-                          <Route path="/" element={<Navigate to="/employees" replace />} />
+                          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                          <Route path="/dashboard" element={<DashboardPage />} />
                           <Route path="/org/*" element={<OrgPage />} />
                           <Route path="/employees/*" element={<EmployeesPage />} />
                           <Route path="/recruitment/*" element={<RecruitmentPage />} />

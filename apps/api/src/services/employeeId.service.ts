@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { prisma } from "../lib/prisma.js";
 
 /**
@@ -12,12 +13,10 @@ import { prisma } from "../lib/prisma.js";
  */
 export async function generate(campusId: string, year: number): Promise<string> {
   // Atomically increment (or create) the counter for this campus+year
-  const counter = await prisma.$transaction(async (tx: typeof prisma) => {
-    return tx.employeeIDCounter.upsert({
-      where: { campusId_year: { campusId, year } },
-      update: { sequence: { increment: 1 } },
-      create: { campusId, year, sequence: 1 },
-    });
+  const counter = await prisma.employeeIDCounter.upsert({
+    where: { campusId_year: { campusId, year } },
+    update: { sequence: { increment: 1 } },
+    create: { id: randomUUID(), campusId, year, sequence: 1 },
   });
 
   // Fetch the campus code

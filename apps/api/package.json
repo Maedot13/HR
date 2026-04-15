@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@hrms/shared": "*",
+    "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
+    "pg": "^8.20.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^17.4.1",

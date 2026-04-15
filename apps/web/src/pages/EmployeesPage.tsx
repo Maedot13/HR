@@ -14,6 +14,8 @@ interface Employee {
   contactInfo: unknown; emergencyContact: unknown; academicRank: string;
   departmentId: string;
 }
+interface Campus { id: string; code: string; name: string; }
+interface CreatedCredentials { employeeId: string; tempPassword: string; fullName: string; }
 interface HistoryEntry { id: string; changeType: string; previousValue: string; newValue: string; changedAt: string; }
 
 const RANKS = ["LECTURER", "ASSISTANT_PROFESSOR", "ASSOCIATE_PROFESSOR"];
@@ -64,8 +66,21 @@ function parseEmergencyContact(raw: unknown): EmergencyFields {
 
 // ─── EmployeeForm ─────────────────────────────────────────────────────────────
 
-function EmployeeForm({ employee, onClose }: { employee: Employee | null; onClose: () => void }) {
+function EmployeeForm({ employee, onClose, onCreated }: {
+  employee: Employee | null;
+  onClose: () => void;
+  onCreated?: (creds: CreatedCredentials) => void;
+}) {
   const qc = useQueryClient();
+
+  // Fetch campuses for the dropdown (only needed when creating)
+  const { data: campusData, isLoading: campusLoading } = useQuery<{ data: Campus[] }>({
+    queryKey: ["campuses"],
+    queryFn: () => api.get("/campuses").then(r => r.data),
+    enabled: !employee,
+    staleTime: 5 * 60 * 1000,
+  });
+  const campuses: Campus[] = campusData?.data ?? [];
 
   const [form, setForm] = useState({
     fullName:    employee?.fullName ?? "",
@@ -132,7 +147,14 @@ function EmployeeForm({ employee, onClose }: { employee: Employee | null; onClos
         ? api.put(`/employees/${employee.id}`, payload)
         : api.post("/employees", payload);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["employees"] }); onClose(); },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["employees"] });
+      if (!employee && onCreated) {
+        const d = (res as { data: { data: { employeeId: string; tempPassword: string; fullName: string } } }).data.data;
+        onCreated({ employeeId: d.employeeId, tempPassword: d.tempPassword, fullName: d.fullName });
+      }
+      onClose();
+    },
     onError: (e: any) => setApiError(
       e.response?.data?.error?.message ??
       "Unable to save employee. Check your input and try again, or contact support."
@@ -180,7 +202,6 @@ function EmployeeForm({ employee, onClose }: { employee: Employee | null; onClos
         <Select value={form.gender} label="Gender" onChange={e => setForm(p => ({ ...p, gender: e.target.value }))}>
           <MenuItem value="MALE">Male</MenuItem>
           <MenuItem value="FEMALE">Female</MenuItem>
-          <MenuItem value="OTHER">Other</MenuItem>
         </Select>
       </FormControl>
       <TextField
@@ -265,15 +286,26 @@ function EmployeeForm({ employee, onClose }: { employee: Employee | null; onClos
         </Select>
       </FormControl>
       {!employee && (
-        <TextField
-          label="Campus ID"
-          value={form.campusId}
-          onChange={e => setForm(p => ({ ...p, campusId: e.target.value }))}
-          onBlur={() => touch("campusId")}
-          error={!!show("campusId")}
-          helperText={show("campusId") ?? "The campus this employee belongs to"}
-          required
-        />
+        <FormControl required error={!!show("campusId")}>
+          <InputLabel>Campus</InputLabel>
+          <Select
+            value={form.campusId}
+            label="Campus"
+            disabled={campusLoading}
+            onChange={e => setForm(p => ({ ...p, campusId: e.target.value }))}
+            onBlur={() => touch("campusId")}
+          >
+            <MenuItem value=""><em>{campusLoading ? "Loading campuses…" : "Select a campus"}</em></MenuItem>
+            {campuses.map(c => (
+              <MenuItem key={c.id} value={c.id}>{c.name} ({c.code})</MenuItem>
+            ))}
+          </Select>
+          {show("campusId") && (
+            <Typography variant="caption" color="error" sx={{ ml: 1.75, mt: 0.3 }}>
+              {show("campusId")}
+            </Typography>
+          )}
+        </FormControl>
       )}
       <Button variant="contained" onClick={handleSave} disabled={save.isPending}>
         Save
@@ -375,6 +407,7 @@ export default function EmployeesPage() {
   const [roleEmployee, setRoleEmployee] = useState<Employee | null>(null);
   const [historyEmployee, setHistoryEmployee] = useState<Employee | null>(null);
   const [activateError, setActivateError] = useState<{ id: string; msg: string } | null>(null);
+  const [newCreds, setNewCreds] = useState<CreatedCredentials | null>(null);
 
   const canManage = user?.role !== "EMPLOYEE";
   const canAssignRoles = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
@@ -456,8 +489,29 @@ export default function EmployeesPage() {
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Create Employee</DialogTitle>
-        <DialogContent><EmployeeForm employee={null} onClose={() => setCreateOpen(false)} /></DialogContent>
+        <DialogContent>
+          <EmployeeForm
+            employee={null}
+            onClose={() => setCreateOpen(false)}
+            onCreated={(creds) => { setCreateOpen(false); setNewCreds(creds); }}
+          />
+        </DialogContent>
         <DialogActions><Button onClick={() => setCreateOpen(false)}>Cancel</Button></DialogActions>
+      </Dialog>
+
+      {/* ── Credentials dialog shown after successful employee creation ── */}
+      <Dialog open={!!newCreds} onClose={() => setNewCreds(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Employee Created Successfully</DialogTitle>
+        <DialogContent>
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Share these credentials with <strong>{newCreds?.fullName}</strong>. The password must be changed on first login.
+          </Alert>
+          <Stack spacing={1}>
+            <TextField label="Employee ID" value={newCreds?.employeeId ?? ""} InputProps={{ readOnly: true }} fullWidth />
+            <TextField label="Temporary Password" value={newCreds?.tempPassword ?? ""} InputProps={{ readOnly: true }} fullWidth />
+          </Stack>
+        </DialogContent>
+        <DialogActions><Button variant="contained" onClick={() => setNewCreds(null)}>Done</Button></DialogActions>
       </Dialog>
 
       <Dialog open={!!editEmployee} onClose={() => setEditEmployee(null)} maxWidth="sm" fullWidth>

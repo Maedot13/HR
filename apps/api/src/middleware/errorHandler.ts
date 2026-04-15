@@ -80,6 +80,15 @@ export function errorHandler(
       });
       return;
     }
+    if (err.code === "P2003") {
+      res.status(422).json({
+        error: {
+          code: "INVALID_REFERENCE",
+          message: "A referenced record does not exist. Please check your inputs.",
+        },
+      });
+      return;
+    }
     if (err.code === "P2025") {
       res.status(404).json({
         error: {
@@ -91,12 +100,21 @@ export function errorHandler(
     }
   }
 
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    res.status(422).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "The provided data is invalid. Please ensure all fields have correct formats and required fields are provided.",
+      },
+    });
+    return;
+  }
+
   if (
     err instanceof Prisma.PrismaClientInitializationError ||
     err instanceof Prisma.PrismaClientKnownRequestError ||
     err instanceof Prisma.PrismaClientUnknownRequestError ||
-    err instanceof Prisma.PrismaClientRustPanicError ||
-    err instanceof Prisma.PrismaClientValidationError
+    err instanceof Prisma.PrismaClientRustPanicError
   ) {
     res.status(500).json({
       error: {
