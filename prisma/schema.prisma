@@ -139,6 +139,7 @@ model Employee {
   EmployeeDocument   EmployeeDocument[]
   EmploymentHistory  EmploymentHistory[]
   Evaluation         Evaluation[]
+  EmployeeSalary     EmployeeSalary[]
   ExperienceLetter   ExperienceLetter[]
   LeaveApplication   LeaveApplication[]
   LeaveBalance       LeaveBalance[]
@@ -155,6 +156,16 @@ model EmployeeDocument {
   uploadedAt   DateTime @default(now())
   uploadedBy   String
   Employee     Employee @relation(fields: [employeeId], references: [id])
+}
+
+model EmployeeSalary {
+  id            String   @id @default(uuid())
+  employeeId    String
+  baseSalary    Float
+  bonus         Float    @default(0)
+  penalty       Float    @default(0)
+  effectiveFrom DateTime
+  Employee      Employee @relation(fields: [employeeId], references: [id])
 }
 
 model EmployeeIDCounter {
@@ -285,6 +296,7 @@ model PayrollReport {
   generatedBy   String
   generatedAt   DateTime        @default(now())
   status        ReportStatus    @default(DRAFT)
+  dataSnapshot  Json?
   PayrollExport PayrollExport[]
 }
 

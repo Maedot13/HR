@@ -3,6 +3,9 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
 import { authenticate } from "./middleware/auth.js";
 import { enforcePasswordChange } from "./middleware/firstLogin.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -35,6 +38,13 @@ app.use(
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json());
+
+// ── Static file serving for generated documents ───────────────────────────────
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDir = path.resolve(__dirname, "..", "uploads");
+fs.mkdirSync(path.join(uploadsDir, "letters"), { recursive: true });
+fs.mkdirSync(path.join(uploadsDir, "exports"), { recursive: true });
+app.use("/uploads", express.static(uploadsDir));
 
 // ── Request ID injection ──────────────────────────────────────────────────────
 app.use((req, _res, next) => {

@@ -1,0 +1,233 @@
+/**
+ * Permission codes used throughout the HRMS.
+ * Format: "<resource>:<action>"
+ */
+export const PERMISSIONS = {
+    // Campus / Org hierarchy
+    CAMPUS_CREATE: "campus:create",
+    CAMPUS_READ: "campus:read",
+    CAMPUS_UPDATE: "campus:update",
+    CAMPUS_DELETE: "campus:delete",
+    COLLEGE_CREATE: "college:create",
+    COLLEGE_READ: "college:read",
+    COLLEGE_UPDATE: "college:update",
+    COLLEGE_DELETE: "college:delete",
+    DEPARTMENT_CREATE: "department:create",
+    DEPARTMENT_READ: "department:read",
+    DEPARTMENT_UPDATE: "department:update",
+    DEPARTMENT_DELETE: "department:delete",
+    UNIT_CREATE: "unit:create",
+    UNIT_READ: "unit:read",
+    UNIT_UPDATE: "unit:update",
+    UNIT_DELETE: "unit:delete",
+    // Employee
+    EMPLOYEE_CREATE: "employee:create",
+    EMPLOYEE_READ: "employee:read",
+    EMPLOYEE_UPDATE: "employee:update",
+    EMPLOYEE_ACTIVATE: "employee:activate",
+    EMPLOYEE_DOCUMENT_UPLOAD: "employee:document:upload",
+    EMPLOYEE_ROLE_ASSIGN: "employee:role:assign",
+    EMPLOYEE_PRIVILEGE_ASSIGN: "employee:privilege:assign",
+    // Recruitment
+    JOB_POSTING_CREATE: "job_posting:create",
+    JOB_POSTING_READ: "job_posting:read",
+    JOB_POSTING_UPDATE: "job_posting:update",
+    APPLICATION_SUBMIT: "application:submit",
+    APPLICATION_ADVANCE: "application:advance",
+    APPLICATION_OFFER: "application:offer",
+    // Onboarding
+    ONBOARDING_READ: "onboarding:read",
+    ONBOARDING_UPDATE: "onboarding:update",
+    ONBOARDING_COMPLETE: "onboarding:complete",
+    // Timetable
+    SCHEDULE_CREATE: "schedule:create",
+    SCHEDULE_READ: "schedule:read",
+    SCHEDULE_UPDATE: "schedule:update",
+    SCHEDULE_DELETE: "schedule:delete",
+    SCHEDULE_SUBSTITUTION: "schedule:substitution",
+    // Leave
+    LEAVE_APPLY: "leave:apply",
+    LEAVE_READ: "leave:read",
+    LEAVE_APPROVE: "leave:approve",
+    LEAVE_REJECT: "leave:reject",
+    LEAVE_WITHOUT_PAY_APPROVE: "leave:without_pay:approve",
+    // Performance appraisal
+    EVALUATION_CREATE: "evaluation:create",
+    EVALUATION_READ: "evaluation:read",
+    EVALUATION_UPDATE: "evaluation:update",
+    // Training
+    TRAINING_CREATE: "training:create",
+    TRAINING_READ: "training:read",
+    TRAINING_ASSIGN: "training:assign",
+    TRAINING_COMPLETE: "training:complete",
+    // Payroll
+    PAYROLL_GENERATE: "payroll:generate",
+    PAYROLL_READ: "payroll:read",
+    PAYROLL_EXPORT: "payroll:export",
+    PAYROLL_VALIDATE: "payroll:validate",
+    // Clearance
+    CLEARANCE_BODY_CONFIGURE: "clearance_body:configure",
+    CLEARANCE_INITIATE: "clearance:initiate",
+    CLEARANCE_READ: "clearance:read",
+    CLEARANCE_TASK_APPROVE: "clearance_task:approve",
+    CLEARANCE_TASK_REJECT: "clearance_task:reject",
+    // Experience letters
+    EXPERIENCE_LETTER_GENERATE: "experience_letter:generate",
+    EXPERIENCE_LETTER_READ: "experience_letter:read",
+    // Activity log
+    ACTIVITY_LOG_READ: "activity_log:read",
+    // Account
+    DEACTIVATED_EMPLOYEE_READ: "deactivated_employee:read",
+};
+/**
+ * Permissions granted to each base role.
+ * Super_Admin has all permissions; each lower role has a subset.
+ */
+export const ROLE_PERMISSIONS = {
+    SUPER_ADMIN: new Set(Object.values(PERMISSIONS)),
+    ADMIN: new Set([
+        PERMISSIONS.CAMPUS_READ,
+        PERMISSIONS.COLLEGE_CREATE,
+        PERMISSIONS.COLLEGE_READ,
+        PERMISSIONS.COLLEGE_UPDATE,
+        PERMISSIONS.COLLEGE_DELETE,
+        PERMISSIONS.DEPARTMENT_CREATE,
+        PERMISSIONS.DEPARTMENT_READ,
+        PERMISSIONS.DEPARTMENT_UPDATE,
+        PERMISSIONS.DEPARTMENT_DELETE,
+        PERMISSIONS.UNIT_CREATE,
+        PERMISSIONS.UNIT_READ,
+        PERMISSIONS.UNIT_UPDATE,
+        PERMISSIONS.UNIT_DELETE,
+        PERMISSIONS.EMPLOYEE_CREATE,
+        PERMISSIONS.EMPLOYEE_READ,
+        PERMISSIONS.EMPLOYEE_UPDATE,
+        PERMISSIONS.EMPLOYEE_ACTIVATE,
+        PERMISSIONS.EMPLOYEE_DOCUMENT_UPLOAD,
+        PERMISSIONS.EMPLOYEE_ROLE_ASSIGN,
+        PERMISSIONS.EMPLOYEE_PRIVILEGE_ASSIGN,
+        PERMISSIONS.JOB_POSTING_CREATE,
+        PERMISSIONS.JOB_POSTING_READ,
+        PERMISSIONS.JOB_POSTING_UPDATE,
+        PERMISSIONS.APPLICATION_SUBMIT,
+        PERMISSIONS.APPLICATION_ADVANCE,
+        PERMISSIONS.APPLICATION_OFFER,
+        PERMISSIONS.ONBOARDING_READ,
+        PERMISSIONS.ONBOARDING_UPDATE,
+        PERMISSIONS.ONBOARDING_COMPLETE,
+        PERMISSIONS.SCHEDULE_CREATE,
+        PERMISSIONS.SCHEDULE_READ,
+        PERMISSIONS.SCHEDULE_UPDATE,
+        PERMISSIONS.SCHEDULE_DELETE,
+        PERMISSIONS.SCHEDULE_SUBSTITUTION,
+        PERMISSIONS.LEAVE_READ,
+        PERMISSIONS.LEAVE_APPROVE,
+        PERMISSIONS.LEAVE_REJECT,
+        PERMISSIONS.EVALUATION_CREATE,
+        PERMISSIONS.EVALUATION_READ,
+        PERMISSIONS.EVALUATION_UPDATE,
+        PERMISSIONS.TRAINING_CREATE,
+        PERMISSIONS.TRAINING_READ,
+        PERMISSIONS.TRAINING_ASSIGN,
+        PERMISSIONS.TRAINING_COMPLETE,
+        // PAYROLL: generate/export restricted to HR_OFFICER; read + validate available to ADMIN
+        // as Finance-proxy per Req 12 (Finance_Actor validates reports sent by HR_Officer)
+        PERMISSIONS.PAYROLL_READ,
+        PERMISSIONS.PAYROLL_EXPORT,
+        PERMISSIONS.PAYROLL_VALIDATE,
+        PERMISSIONS.CLEARANCE_BODY_CONFIGURE,
+        PERMISSIONS.CLEARANCE_INITIATE,
+        PERMISSIONS.CLEARANCE_READ,
+        PERMISSIONS.CLEARANCE_TASK_APPROVE,
+        PERMISSIONS.CLEARANCE_TASK_REJECT,
+        // EXPERIENCE_LETTER: HR_OFFICER only — not granted to ADMIN
+        // ACTIVITY_LOG: SUPER_ADMIN only — not granted to ADMIN
+    ]),
+    HR_OFFICER: new Set([
+        PERMISSIONS.CAMPUS_READ,
+        PERMISSIONS.COLLEGE_READ,
+        PERMISSIONS.DEPARTMENT_READ,
+        PERMISSIONS.UNIT_READ,
+        PERMISSIONS.EMPLOYEE_CREATE,
+        PERMISSIONS.EMPLOYEE_READ,
+        PERMISSIONS.EMPLOYEE_UPDATE,
+        PERMISSIONS.EMPLOYEE_ACTIVATE,
+        PERMISSIONS.EMPLOYEE_DOCUMENT_UPLOAD,
+        PERMISSIONS.JOB_POSTING_CREATE,
+        PERMISSIONS.JOB_POSTING_READ,
+        PERMISSIONS.JOB_POSTING_UPDATE,
+        PERMISSIONS.APPLICATION_SUBMIT,
+        PERMISSIONS.APPLICATION_ADVANCE,
+        PERMISSIONS.APPLICATION_OFFER,
+        PERMISSIONS.ONBOARDING_READ,
+        PERMISSIONS.ONBOARDING_UPDATE,
+        PERMISSIONS.ONBOARDING_COMPLETE,
+        PERMISSIONS.SCHEDULE_READ,
+        PERMISSIONS.LEAVE_READ,
+        PERMISSIONS.LEAVE_APPROVE,
+        PERMISSIONS.LEAVE_REJECT,
+        PERMISSIONS.EVALUATION_CREATE,
+        PERMISSIONS.EVALUATION_READ,
+        PERMISSIONS.EVALUATION_UPDATE,
+        PERMISSIONS.TRAINING_CREATE,
+        PERMISSIONS.TRAINING_READ,
+        PERMISSIONS.TRAINING_ASSIGN,
+        PERMISSIONS.TRAINING_COMPLETE,
+        PERMISSIONS.PAYROLL_GENERATE,
+        PERMISSIONS.PAYROLL_READ,
+        PERMISSIONS.PAYROLL_EXPORT,
+        PERMISSIONS.CLEARANCE_INITIATE,
+        PERMISSIONS.CLEARANCE_READ,
+        PERMISSIONS.EXPERIENCE_LETTER_GENERATE,
+        PERMISSIONS.EXPERIENCE_LETTER_READ,
+        // ACTIVITY_LOG: SUPER_ADMIN only — removed from HR_OFFICER
+    ]),
+    EMPLOYEE: new Set([
+        PERMISSIONS.CAMPUS_READ,
+        PERMISSIONS.COLLEGE_READ,
+        PERMISSIONS.DEPARTMENT_READ,
+        PERMISSIONS.UNIT_READ,
+        PERMISSIONS.EMPLOYEE_READ,
+        PERMISSIONS.SCHEDULE_READ,
+        PERMISSIONS.LEAVE_APPLY,
+        PERMISSIONS.LEAVE_READ,
+        PERMISSIONS.EVALUATION_READ,
+        PERMISSIONS.TRAINING_READ,
+        PERMISSIONS.TRAINING_COMPLETE,
+        PERMISSIONS.EXPERIENCE_LETTER_READ,
+    ]),
+};
+/**
+ * Additional permissions granted by each special privilege.
+ * These are ADDED to (not replacing) the user's base role permissions.
+ */
+export const PRIVILEGE_PERMISSIONS = {
+    UNIVERSITY_PRESIDENT: new Set([
+        PERMISSIONS.LEAVE_WITHOUT_PAY_APPROVE,
+        PERMISSIONS.DEACTIVATED_EMPLOYEE_READ,
+        PERMISSIONS.CLEARANCE_READ,
+        // PAYROLL_READ and ACTIVITY_LOG_READ: reserved for HR_OFFICER and SUPER_ADMIN respectively
+    ]),
+    VICE_PRESIDENT: new Set([
+        PERMISSIONS.CLEARANCE_READ,
+        PERMISSIONS.EMPLOYEE_READ,
+        // ACTIVITY_LOG_READ and PAYROLL_READ: reserved for SUPER_ADMIN and HR_OFFICER respectively
+    ]),
+    DEAN: new Set([
+        PERMISSIONS.EMPLOYEE_READ,
+        PERMISSIONS.SCHEDULE_READ,
+        PERMISSIONS.LEAVE_READ,
+        PERMISSIONS.EVALUATION_READ,
+        PERMISSIONS.TRAINING_READ,
+        PERMISSIONS.CLEARANCE_READ,
+    ]),
+    DIRECTOR: new Set([
+        PERMISSIONS.EMPLOYEE_READ,
+        PERMISSIONS.SCHEDULE_READ,
+        PERMISSIONS.LEAVE_READ,
+        PERMISSIONS.EVALUATION_READ,
+        PERMISSIONS.TRAINING_READ,
+        PERMISSIONS.CLEARANCE_READ,
+    ]),
+};
+//# sourceMappingURL=constants.js.map

@@ -54,18 +54,18 @@ export default function App() {
                         <Routes>
                           <Route path="/" element={<Navigate to="/dashboard" replace />} />
                           <Route path="/dashboard" element={<DashboardPage />} />
-                          <Route path="/org/*" element={<OrgPage />} />
-                          <Route path="/employees/*" element={<EmployeesPage />} />
-                          <Route path="/recruitment/*" element={<RecruitmentPage />} />
-                          <Route path="/onboarding/*" element={<OnboardingPage />} />
-                          <Route path="/timetable/*" element={<TimetablePage />} />
-                          <Route path="/leave/*" element={<LeavePage />} />
-                          <Route path="/appraisal/*" element={<AppraisalPage />} />
-                          <Route path="/training/*" element={<TrainingPage />} />
-                          <Route path="/payroll/*" element={<PayrollPage />} />
-                          <Route path="/clearance/*" element={<ClearancePage />} />
-                          <Route path="/experience-letters/*" element={<ExperienceLettersPage />} />
-                          <Route path="/activity-log/*" element={<ActivityLogPage />} />
+                          <Route path="/org/*"               element={<ProtectedRoute permission="college:create"><OrgPage /></ProtectedRoute>} />
+                          <Route path="/employees/*"         element={<ProtectedRoute permission="employee:create"><EmployeesPage /></ProtectedRoute>} />
+                          <Route path="/recruitment/*"       element={<ProtectedRoute permission="job_posting:create"><RecruitmentPage /></ProtectedRoute>} />
+                          <Route path="/onboarding/*"        element={<ProtectedRoute permission="onboarding:read"><OnboardingPage /></ProtectedRoute>} />
+                          <Route path="/timetable/*"         element={<ProtectedRoute permission="schedule:read"><TimetablePage /></ProtectedRoute>} />
+                          <Route path="/leave/*"             element={<ProtectedRoute permission="leave:read"><LeavePage /></ProtectedRoute>} />
+                          <Route path="/appraisal/*"         element={<ProtectedRoute permission="evaluation:read"><AppraisalPage /></ProtectedRoute>} />
+                          <Route path="/training/*"          element={<ProtectedRoute permission="training:read"><TrainingPage /></ProtectedRoute>} />
+                          <Route path="/payroll/*"           element={<ProtectedRoute permission="payroll:read"><PayrollPage /></ProtectedRoute>} />
+                          <Route path="/clearance/*"         element={<ProtectedRoute permission="clearance:initiate"><ClearancePage /></ProtectedRoute>} />
+                          <Route path="/experience-letters/*" element={<ProtectedRoute permission="experience_letter:generate"><ExperienceLettersPage /></ProtectedRoute>} />
+                          <Route path="/activity-log/*"      element={<ProtectedRoute permission="activity_log:read"><ActivityLogPage /></ProtectedRoute>} />
                         </Routes>
                       </Suspense>
                     </Layout>

@@ -10,6 +10,7 @@ type AnyPrismaClient = any;
 const globalForPrisma = globalThis as unknown as {
   prisma?: AnyPrismaClient;
   pool?: pg.Pool;
+  keepAliveInterval?: ReturnType<typeof setInterval>;
 };
 
 if (!globalForPrisma.pool) {
@@ -18,10 +19,29 @@ if (!globalForPrisma.pool) {
   globalForPrisma.pool = new pg.Pool({
     connectionString: url,
     connectionTimeoutMillis: 30000,
-    idleTimeoutMillis: 5000,
+    // 60 s — long enough to survive Neon's cold-start wake-up time
+    idleTimeoutMillis: 60000,
     max: 10,
     allowExitOnIdle: true,
   });
+
+  // ── Keep-alive ping ────────────────────────────────────────────────────────
+  // Neon free-tier pauses after ~5 min of inactivity.
+  // Ping every 4 min with a lightweight query so the DB stays awake.
+  if (!globalForPrisma.keepAliveInterval) {
+    globalForPrisma.keepAliveInterval = setInterval(async () => {
+      try {
+        const client = await globalForPrisma.pool!.connect();
+        await client.query("SELECT 1");
+        client.release();
+      } catch {
+        // Silently swallow — the next real query will surface any real error.
+      }
+    }, 4 * 60 * 1000); // every 4 minutes
+
+    // Don't block the process from exiting cleanly
+    globalForPrisma.keepAliveInterval.unref?.();
+  }
 }
 
 if (!globalForPrisma.prisma) {
@@ -70,9 +90,53 @@ if (!globalForPrisma.prisma) {
           }
           return query(args);
         },
+        async update({ model, args, query }: { model: string; args: { data: Record<string, unknown> }; query: (args: unknown) => unknown }) {
+          if (MODELS_WITH_UPDATED_AT.has(model.toLowerCase()) && args.data.updatedAt === undefined) {
+            args.data.updatedAt = new Date();
+          }
+          return query(args);
+        },
       },
     },
   });
 }
 
-export const prisma: PrismaClient = globalForPrisma.prisma;
+// ── Resilient Prisma export ────────────────────────────────────────────────
+// Neon free-tier wakes on first query but that query itself times out (P1001 /
+// ETIMEDOUT). This Proxy catches those codes, waits 3 s for the DB to fully
+// wake, then retries the same call once — making it invisible to service code.
+function withRetry(client: AnyPrismaClient): AnyPrismaClient {
+  return new Proxy(client, {
+    get(target, prop) {
+      const value = target[prop];
+      if (typeof value !== "object" || value === null) return value;
+
+      // Each model delegate (e.g. prisma.employee) is an object whose methods
+      // we want to wrap.
+      return new Proxy(value, {
+        get(modelTarget, method) {
+          const fn = modelTarget[method];
+          if (typeof fn !== "function") return fn;
+
+          return async (...args: unknown[]) => {
+            try {
+              return await fn.apply(modelTarget, args);
+            } catch (err: unknown) {
+              const code = (err as { code?: string })?.code;
+              if (code === "ETIMEDOUT" || code === "P1001") {
+                console.warn(
+                  `[Prisma] DB connection timeout (${code}). Retrying in 3 s…`
+                );
+                await new Promise((r) => setTimeout(r, 3000));
+                return fn.apply(modelTarget, args); // one retry
+              }
+              throw err;
+            }
+          };
+        },
+      });
+    },
+  });
+}
+
+export const prisma: PrismaClient = withRetry(globalForPrisma.prisma);

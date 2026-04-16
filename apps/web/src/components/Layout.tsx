@@ -1,35 +1,49 @@
 import React, { useState } from "react";
 import {
   AppBar, Box, CssBaseline, Drawer, IconButton, List, ListItemButton,
-  ListItemText, Toolbar, Typography, Divider,
+  ListItemText, Toolbar, Typography, Divider, Chip,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.js";
+import { usePermissions } from "../hooks/usePermissions.js";
 
 const DRAWER_WIDTH = 240;
 
+// permission: null = visible to every authenticated user
+// permission: "<code>" = visible only when the user's effective permissions include that code
 const NAV_ITEMS = [
-  { label: "Dashboard", path: "/" },
-  { label: "Org Hierarchy", path: "/org" },
-  { label: "Employees", path: "/employees" },
-  { label: "Recruitment", path: "/recruitment" },
-  { label: "Onboarding", path: "/onboarding" },
-  { label: "Timetable", path: "/timetable" },
-  { label: "Leave", path: "/leave" },
-  { label: "Appraisal", path: "/appraisal" },
-  { label: "Training", path: "/training" },
-  { label: "Payroll", path: "/payroll" },
-  { label: "Clearance", path: "/clearance" },
-  { label: "Experience Letters", path: "/experience-letters" },
-  { label: "Activity Log", path: "/activity-log" },
-];
+  { label: "Dashboard",          path: "/dashboard",          permission: null },
+  { label: "Org Hierarchy",      path: "/org",                permission: "college:create" },   // SA + ADMIN only
+  { label: "Employees",          path: "/employees",          permission: "employee:create" },  // SA + ADMIN + HR
+  { label: "Recruitment",        path: "/recruitment",        permission: "job_posting:create" },
+  { label: "Onboarding",         path: "/onboarding",         permission: "onboarding:read" },
+  { label: "Timetable",          path: "/timetable",          permission: "schedule:read" },    // all roles
+  { label: "Leave",              path: "/leave",              permission: "leave:read" },       // all roles
+  { label: "Appraisal",          path: "/appraisal",          permission: "evaluation:read" },  // all roles
+  { label: "Training",           path: "/training",           permission: "training:read" },    // all roles
+  { label: "Payroll",            path: "/payroll",            permission: "payroll:read" },     // HR_OFFICER only
+  { label: "Clearance",          path: "/clearance",          permission: "clearance:initiate" }, // SA + ADMIN + HR
+  { label: "Experience Letters", path: "/experience-letters", permission: "experience_letter:generate" }, // HR only
+  { label: "Activity Log",       path: "/activity-log",       permission: "activity_log:read" }, // SA only
+] as const;
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const permissions = usePermissions();
+
+  // Filter nav items to only those the user has permission to see
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => item.permission === null || permissions.has(item.permission)
+  );
+
+  const isSelected = (path: string) =>
+    path === "/dashboard"
+      ? location.pathname === "/dashboard" || location.pathname === "/"
+      : location.pathname === path || location.pathname.startsWith(path + "/");
 
   const drawer = (
     <Box>
@@ -38,10 +52,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </Toolbar>
       <Divider />
       <List dense>
-        {NAV_ITEMS.map((item) => (
+        {visibleItems.map((item) => (
           <ListItemButton
             key={item.path}
-            selected={location.pathname.startsWith(item.path) && (item.path !== "/" || location.pathname === "/")}
+            selected={isSelected(item.path)}
             onClick={() => navigate(item.path)}
           >
             <ListItemText primary={item.label} />
@@ -68,7 +82,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
             Bahir Dar University HRMS
           </Typography>
-          <Typography variant="body2">{user?.role}</Typography>
+          <Typography variant="body2" sx={{ mr: 1 }}>{user?.role?.replace(/_/g, " ")}</Typography>
+          {user?.specialPrivilege && (
+            <Chip
+              label={user.specialPrivilege.replace(/_/g, " ")}
+              size="small"
+              color="secondary"
+              sx={{ ml: 0.5 }}
+            />
+          )}
         </Toolbar>
       </AppBar>
 

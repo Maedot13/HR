@@ -7,12 +7,14 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../lib/axios.js";
 import { useAuth } from "../contexts/AuthContext.js";
+import { usePermissions } from "../hooks/usePermissions.js";
 
+interface UserRole { baseRole: string; specialPrivilege: string | null; }
 interface Employee {
   id: string; employeeId: string; fullName: string; status: string;
   gender: string; nationality: string; dateOfBirth: string;
   contactInfo: unknown; emergencyContact: unknown; academicRank: string;
-  departmentId: string;
+  departmentId: string; UserRole?: UserRole | null;
 }
 interface Campus { id: string; code: string; name: string; }
 interface CreatedCredentials { employeeId: string; tempPassword: string; fullName: string; }
@@ -318,26 +320,30 @@ function EmployeeForm({ employee, onClose, onCreated }: {
 
 function RoleForm({ employee, onClose }: { employee: Employee; onClose: () => void }) {
   const qc = useQueryClient();
-  const [role, setRole] = useState("EMPLOYEE");
-  const [privilege, setPrivilege] = useState("");
+  // Pre-populate with the employee's CURRENT role and privilege
+  const [role, setRole] = useState(employee.UserRole?.baseRole ?? "EMPLOYEE");
+  const [privilege, setPrivilege] = useState(employee.UserRole?.specialPrivilege ?? "");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const saveRole = useMutation({
-    mutationFn: () => api.put(`/employees/${employee.id}/role`, { baseRole: role }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
-    onError: (e: any) => setError(
-      e.response?.data?.error?.message ??
-      "Unable to update role. Please try again or contact your administrator."
-    ),
-  });
-  const savePriv = useMutation({
-    mutationFn: () => api.put(`/employees/${employee.id}/privilege`, { specialPrivilege: privilege || null }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["employees"] }); onClose(); },
-    onError: (e: any) => setError(
-      e.response?.data?.error?.message ??
-      "Unable to update privilege. Please try again or contact your administrator."
-    ),
-  });
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      // Always save role first, then privilege
+      await api.put(`/employees/${employee.id}/role`, { baseRole: role });
+      await api.put(`/employees/${employee.id}/privilege`, { specialPrivilege: privilege || null });
+      qc.invalidateQueries({ queryKey: ["employees"] });
+      onClose();
+    } catch (e: any) {
+      setError(
+        e.response?.data?.error?.message ??
+        "Unable to update role. Please try again or contact your administrator."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Stack spacing={2} sx={{ mt: 1 }}>
@@ -355,10 +361,9 @@ function RoleForm({ employee, onClose }: { employee: Employee; onClose: () => vo
           {["UNIVERSITY_PRESIDENT", "VICE_PRESIDENT", "DEAN", "DIRECTOR"].map(p => <MenuItem key={p} value={p}>{p.replace(/_/g, " ")}</MenuItem>)}
         </Select>
       </FormControl>
-      <Stack direction="row" spacing={1}>
-        <Button variant="outlined" onClick={() => saveRole.mutate()} disabled={saveRole.isPending}>Save Role</Button>
-        <Button variant="contained" onClick={() => savePriv.mutate()} disabled={savePriv.isPending}>Save Privilege</Button>
-      </Stack>
+      <Button variant="contained" onClick={handleSave} disabled={saving}>
+        {saving ? "Saving…" : "Save"}
+      </Button>
     </Stack>
   );
 }
@@ -409,8 +414,11 @@ export default function EmployeesPage() {
   const [activateError, setActivateError] = useState<{ id: string; msg: string } | null>(null);
   const [newCreds, setNewCreds] = useState<CreatedCredentials | null>(null);
 
-  const canManage = user?.role !== "EMPLOYEE";
-  const canAssignRoles = user?.role === "SUPER_ADMIN" || user?.role === "ADMIN";
+  const permissions = usePermissions();
+  const canCreate    = permissions.has("employee:create");
+  const canEdit      = permissions.has("employee:update");
+  const canActivate  = permissions.has("employee:activate");
+  const canAssignRoles = permissions.has("employee:role:assign");
 
   const { data, isLoading, error } = useQuery<{ data: Employee[] }>({
     queryKey: ["employees", search, statusFilter],
@@ -444,7 +452,7 @@ export default function EmployeesPage() {
             <MenuItem value="PENDING">Pending</MenuItem>
           </Select>
         </FormControl>
-        {canManage && <Button variant="contained" onClick={() => setCreateOpen(true)}>Add Employee</Button>}
+        {canCreate && <Button variant="contained" onClick={() => setCreateOpen(true)}>Add Employee</Button>}
       </Stack>
 
       {error && (
@@ -474,8 +482,8 @@ export default function EmployeesPage() {
                 <TableCell>{emp.academicRank?.replace(/_/g, " ") ?? "—"}</TableCell>
                 <TableCell>
                   <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                    {canManage && <Button size="small" onClick={() => setEditEmployee(emp)}>Edit</Button>}
-                    {canManage && emp.status !== "ACTIVE" && <Button size="small" color="success" onClick={() => activate.mutate(emp.id)}>Activate</Button>}
+                    {canEdit     && <Button size="small" onClick={() => setEditEmployee(emp)}>Edit</Button>}
+                    {canActivate && emp.status !== "ACTIVE" && <Button size="small" color="success" onClick={() => activate.mutate(emp.id)}>Activate</Button>}
                     <Button size="small" onClick={() => setHistoryEmployee(emp)}>History</Button>
                     {canAssignRoles && <Button size="small" onClick={() => setRoleEmployee(emp)}>Roles</Button>}
                   </Stack>

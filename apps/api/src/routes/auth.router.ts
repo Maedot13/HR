@@ -36,8 +36,11 @@ router.post("/change-password", authenticate, async (req, res) => {
 
   const { currentPassword, newPassword } = parsed.data;
   const ipAddress = req.ip ?? "unknown";
+  // If the user is still on a temp password they just proved their identity
+  // moments ago at login — no need to re-type the random temp password.
+  const skipCurrentPasswordCheck = Boolean(req.user.isTempPassword);
 
-  await changePassword(req.user.userId, currentPassword, newPassword, ipAddress);
+  await changePassword(req.user.userId, currentPassword, newPassword, ipAddress, skipCurrentPasswordCheck);
 
   res.status(200).json({ data: { message: "Password changed successfully" } });
 });

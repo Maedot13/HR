@@ -99,7 +99,8 @@ export async function changePassword(
   userId: string,
   currentPassword: string,
   newPassword: string,
-  ipAddress: string
+  ipAddress: string,
+  skipCurrentPasswordCheck = false
 ): Promise<void> {
   const employee = await prisma.employee.findUnique({ where: { id: userId } });
 
@@ -107,9 +108,14 @@ export async function changePassword(
     throw new AppError(404, "NOT_FOUND", "Employee not found");
   }
 
-  const passwordMatch = await bcrypt.compare(currentPassword, employee.passwordHash);
-  if (!passwordMatch) {
-    throw new AppError(400, "INVALID_CURRENT_PASSWORD", "Current password is incorrect");
+  // When the user is still on their temp password, they just authenticated via
+  // login seconds ago — their identity is proven. Skip re-entering the random
+  // temp password (it's hidden behind type="password" and causes user friction).
+  if (!skipCurrentPasswordCheck) {
+    const passwordMatch = await bcrypt.compare(currentPassword, employee.passwordHash);
+    if (!passwordMatch) {
+      throw new AppError(400, "INVALID_CURRENT_PASSWORD", "Current password is incorrect");
+    }
   }
 
   const newHash = await bcrypt.hash(newPassword, BCRYPT_COST);
